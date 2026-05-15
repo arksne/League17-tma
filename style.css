@@ -516,7 +516,7 @@ body::before {
 .btn-use:hover { opacity: 0.8; }
 .btn-use.btn-danger { background-color: #ff3b30; }
 
-/* --- LIGA 17 REBORN BATTLE ARENA (Mobile-first) --- */
+/* --- BATTLE ARENA (Mobile-first) --- */
 /* ================================================================
    BATTLE ARENA — League17.ru inspired
    ================================================================ */
@@ -743,7 +743,7 @@ body::before {
 .reborn-escape-link:hover { color: #e09a9a; }
 
 /* ================================================================
-   IN-GAME CHAT (like league17.ru)
+   IN-GAME CHAT
    ================================================================ */
 .reborn-log-container {
   flex: 1;
@@ -776,7 +776,7 @@ body::before {
   color: #8aa0b8;
 }
 
-/* Chat message types (like league17.ru colored chat) */
+/* Chat message types (colored chat) */
 .reborn-battle-log p.chat-battle { color: #f0e0a0; }
 .reborn-battle-log p.chat-dmg { color: #ff7b7b; }
 .reborn-battle-log p.chat-heal { color: #7bff9b; }
@@ -793,7 +793,7 @@ body::before {
 }
 .reborn-battle-log p:last-child { border-bottom: none; }
 
-/* --- LIGA 17 REBORN POKEMON PROFILE --- */
+/* --- POKEMON PROFILE --- */
 .reborn-profile-container {
   background-color: var(--tma-card-bg);
   border: 1px solid var(--tma-border);
@@ -1963,7 +1963,7 @@ input[type="number"] {
 .npc-actions button { flex: 1; }
 
 /* ================================================================
-   CHAT VIEW + TRAINER CARD (like league17.ru)
+   CHAT VIEW + TRAINER CARD
    ================================================================ */
 #view-chat.active-view {
   display: flex;

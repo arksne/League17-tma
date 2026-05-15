@@ -94,7 +94,7 @@ try {
   }
 
   const server = app.listen(PORT, () => {
-    console.log(`League-17 TMA server running on port ${PORT}`);
+    console.log(`PokeMatrix server running on port ${PORT}`);
   });
   initSocket(server, allowedOrigin);
 

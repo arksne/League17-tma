@@ -1454,7 +1454,7 @@ window.myId = function() { console.log('Твой Telegram ID:', tgUser?.id || '�
 window.adminAdd = function(id) { if(!id) { console.log('Используй: adminAdd(ТВОЙ_ID_ИЗ_myId())'); return; } ADMIN_IDS.add(id); console.log('Админ добавлен:', id); };
 window.adminList = function() { console.log('Админы:', Array.from(ADMIN_IDS)); return Array.from(ADMIN_IDS); };
 
-console.log('🛠 League-17 Admin готов. Введи help() для списка команд.');
+console.log('🛠 PokeMatrix Admin готов. Введи help() для списка команд.');
 console.log('📱 Твой Telegram ID: введи myId()');
 
 // 📱 Админ-панель для телефона (кнопка в интерфейсе)
@@ -7805,7 +7805,7 @@ function showLoginScreen(message, isError) {
   overlay.innerHTML = `
     <div style="text-align:center;max-width:320px;padding:24px;">
       <div style="font-size:4rem;margin-bottom:16px;">${isError ? '🔒' : '🐾'}</div>
-      <h2 style="margin:0 0 8px;">League-17 TMA</h2>
+      <h2 style="margin:0 0 8px;">PokeMatrix</h2>
       <p style="color:var(--tma-text-muted);margin:0 0 20px;font-size:0.9rem;">${message}</p>
       ${isError ? '<p style="color:var(--tma-text-muted);font-size:0.8rem;">Откройте игру через Telegram бота</p>' : '<div class="login-spinner" style="width:32px;height:32px;border:3px solid var(--tma-border);border-top-color:var(--tma-primary);border-radius:50%;margin:0 auto;animation:spin 0.8s linear infinite;"></div>'}
     </div>
@@ -8752,7 +8752,7 @@ function editNickname() {
 }
 
 // ================================================================
-// FEATURE: CHAT SYSTEM (like league17.ru)
+// FEATURE: CHAT SYSTEM
 // ================================================================
 let chatPollingInterval = null;
 let chatLastTimestamp = null;

@@ -68,7 +68,7 @@ router.get('/', adminAuth, async (req, res) => {
   const chat = await db.all('SELECT * FROM chat_messages ORDER BY id DESC LIMIT 20');
 
   const html = `<!DOCTYPE html><html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>League-17 Admin</title>
+<title>PokeMatrix Admin</title>
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
 body{font-family:monospace;background:#0a0a0a;color:#e0e0e0;padding:12px}
@@ -89,7 +89,7 @@ input,select{padding:6px;border:1px solid #333;border-radius:4px;background:#111
 pre{background:#111;padding:8px;border-radius:4px;font-size:0.7rem;max-height:300px;overflow:auto}
 .result{color:#5af;margin-top:4px;font-size:0.8rem}
 </style></head><body>
-<h1>🛠 League-17 Admin</h1>
+<h1>🛠 PokeMatrix Admin</h1>
 
 <div class="section">
 <div class="col">
