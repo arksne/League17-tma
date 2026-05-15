@@ -1225,6 +1225,25 @@ function processMonsterDrop(pokemonName) {
 
 // --- NPC DATA ---
 const NPC_DATA = {
+  'claude_ai': {
+    id: 'claude_ai', name: 'Claude AI', sprite: '🤖', location: 'pokecenter',
+    dialog: {
+      greet: 'Привет, тренер! Я Claude — ИИ-ассистент этого мира. Я могу помочь с покемонами, лечением и предметами.',
+      default: 'Заходи в любое время! Я здесь чтобы помогать тренерам. Используй кнопки ниже.',
+      quest_offer: 'Я могу сделать твоих покемонов сильнее. Выбери опцию:',
+      quest_complete: 'Готово! Наслаждайся усиленными покемонами!',
+      quest_incomplete: 'Приходи когда понадобится помощь.',
+    },
+    quests: [
+      { id: 'claude_heal', type: 'special', desc: '🏥 Вылечить всю команду', rewardMoney: 0, rewardItem: null, rewardQty: 0, prereqQuest: null },
+      { id: 'claude_items', type: 'special', desc: '🎒 Дать предметы x99', rewardMoney: 0, rewardItem: null, rewardQty: 0, prereqQuest: null },
+      { id: 'claude_money', type: 'special', desc: '💰 Дать 100 000 кредитов', rewardMoney: 0, rewardItem: null, rewardQty: 0, prereqQuest: null },
+      { id: 'claude_iv', type: 'special', desc: '⭐ Максимальные IV (31)', rewardMoney: 0, rewardItem: null, rewardQty: 0, prereqQuest: null },
+      { id: 'claude_level', type: 'special', desc: '📈 +10 уровней команде', rewardMoney: 0, rewardItem: null, rewardQty: 0, prereqQuest: null },
+      { id: 'claude_badges', type: 'special', desc: '🏅 Все 8 значков', rewardMoney: 0, rewardItem: null, rewardQty: 0, prereqQuest: null },
+      { id: 'claude_legendary', type: 'special', desc: '🦄 Случайный легендарный покемон', rewardMoney: 0, rewardItem: null, rewardQty: 0, prereqQuest: null },
+    ],
+  },
   'oak_lab': {
     id: 'oak_lab', name: 'Профессор Оук', sprite: '👨‍🔬', location: 'pallet_town',
     dialog: {
@@ -2888,6 +2907,51 @@ function openNPCDialog(npcId) {
       modal.style.display = 'none';
     };
     actionsContainer.insertBefore(btnDaycare, document.getElementById('btn-close-npc'));
+  }
+
+  // Claude AI — special admin NPC
+  if (npcId === 'claude_ai') {
+    const claudeActions = [
+      ['🏥 Лечить', () => {
+        myTeam.forEach(m => { m.currentHp = m.maxHp; m.status = null; m.sleepTurns = 0; if(m.movesPP) m.movesPP.forEach(pp => { if(pp) pp.current = pp.max; }); });
+        showToast('Команда вылечена!', false); modal.style.display = 'none'; autoSave();
+      }, '#34c759'],
+      ['🎒 Предметы x99', () => {
+        ITEMS.forEach(i => { inventory[i.id] = 99; }); updateInventoryDisplay();
+        showToast('Предметы x99!', false); modal.style.display = 'none'; autoSave();
+      }, '#007aff'],
+      ['💰 +100к', () => {
+        money += 100000; updateMoneyDisplay();
+        showToast('+100 000¥!', false); modal.style.display = 'none'; autoSave();
+      }, '#ff9500'],
+      ['⭐ Макс IV', () => {
+        myTeam.forEach(m => { m.ivs = {hp:31,atk:31,def:31,spa:31,spd:31,spe:31}; });
+        showToast('IV 31!', false); modal.style.display = 'none'; autoSave();
+      }, '#af52de'],
+      ['📈 +10 ур', () => {
+        myTeam.forEach(m => { for(let i=0;i<10;i++) { m.baseLevel++; m.maxHp = calculateStat(m,'hp',false); m.currentHp = m.maxHp; } });
+        renderTeamGrid(); refreshProfileUI();
+        showToast('+10 уровней!', false); modal.style.display = 'none'; autoSave();
+      }, '#5ac8fa'],
+      ['🏅 Значки', () => {
+        badges = ['Boulder Badge','Cascade Badge','Thunder Badge','Rainbow Badge','Marsh Badge','Soul Badge','Volcano Badge','Earth Badge'];
+        updateBadgeDisplay(); showToast('8 значков!', false); modal.style.display = 'none'; autoSave();
+      }, '#ff3b30'],
+      ['🦄 Легендарный', async () => {
+        const leg = ['mewtwo','mew','lugia','ho-oh','rayquaza','groudon','kyogre','dialga','palkia','zekrom','reshiram','xerneas','yveltal'];
+        const pick = leg[Math.floor(Math.random()*leg.length)];
+        await giveStarterMon(pick); renderTeamGrid();
+        showToast(pick + '!', false); modal.style.display = 'none'; autoSave();
+      }, '#ff3b30'],
+    ];
+    claudeActions.forEach(([label, fn, color]) => {
+      const btn = document.createElement('button');
+      btn.className = 'tma-btn npc-action-extra';
+      btn.style.backgroundColor = color;
+      btn.innerText = label;
+      btn.addEventListener('click', fn);
+      actionsContainer.insertBefore(btn, document.getElementById('btn-close-npc'));
+    });
   }
 }
 
