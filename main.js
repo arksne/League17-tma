@@ -7563,11 +7563,27 @@ let myTradeOffer = null;
 let partnerTradeOffer = null;
 let iAmP1 = false;
 
+function showToast(msg, isError) {
+  let toast = document.getElementById('trade-toast');
+  if (!toast) {
+    toast = document.createElement('div');
+    toast.id = 'trade-toast';
+    toast.style.cssText = 'position:fixed;bottom:100px;left:50%;transform:translateX(-50%);padding:10px 24px;border-radius:8px;font-weight:600;font-size:0.9rem;z-index:300;transition:opacity 0.3s;pointer-events:none;';
+    document.body.appendChild(toast);
+  }
+  toast.style.background = isError ? '#ff3b30' : '#34c759';
+  toast.style.color = '#fff';
+  toast.textContent = msg;
+  toast.style.opacity = '1';
+  clearTimeout(toast._timeout);
+  toast._timeout = setTimeout(() => { toast.style.opacity = '0'; }, 2500);
+}
+
 function initTradeSocket() {
   if (socket) return;
   const serverUrl = window.location.hostname === 'localhost' ? 'http://localhost:3000' : API_BASE.replace('/api', '');
   socket = io(serverUrl);
-  
+
   socket.on('connect', () => {
     socket.emit('join_lobby', { username: tgUser?.first_name || tgUser?.username || 'Тренер', userId: tgUser?.id });
   });
@@ -7578,15 +7594,11 @@ function initTradeSocket() {
   });
 
   socket.on('trade_request_received', (data) => {
-    if (confirm(`Тренер ${data.fromUsername} предлагает обмен! Принять?`)) {
-      socket.emit('trade_accept', data.fromId);
-    } else {
-      socket.emit('trade_reject', data.fromId);
-    }
+    showTradeRequestModal(data.fromUsername, data.fromId);
   });
 
   socket.on('trade_rejected', () => {
-    alert('Тренер отклонил ваше предложение обмена.');
+    showToast('Тренер отклонил предложение обмена', true);
   });
 
   socket.on('trade_started', (data) => {
@@ -7603,61 +7615,104 @@ function initTradeSocket() {
   });
 
   socket.on('trade_confirm_status', (status) => {
-    const myConf = document.getElementById('trade-my-status');
-    const partnerConf = document.getElementById('trade-partner-status');
-    if (!myConf || !partnerConf) return;
-    
-    if (iAmP1) {
-      myConf.innerText = status.p1 ? '✅ Готов' : '⏳ Ждет';
-      partnerConf.innerText = status.p2 ? '✅ Готов' : '⏳ Ждет';
-    } else {
-      myConf.innerText = status.p2 ? '✅ Готов' : '⏳ Ждет';
-      partnerConf.innerText = status.p1 ? '✅ Готов' : '⏳ Ждет';
-    }
+    updateTradeConfirmUI(status);
   });
 
   socket.on('trade_execute', (receivedOffer) => {
-    // 1. Remove my offer from my data
     if (myTradeOffer && myTradeOffer.type === 'pokemon') {
       const idx = myTeam.findIndex(m => m.uid === myTradeOffer.data.uid || m === myTradeOffer.data);
       if (idx !== -1) myTeam.splice(idx, 1);
     }
-    
-    // 2. Add received offer to my data
+
     if (receivedOffer && receivedOffer.type === 'pokemon') {
-      // Create new UID for safety
       receivedOffer.data.uid = Date.now().toString() + Math.random().toString(36).substr(2, 9);
       myTeam.push(receivedOffer.data);
     }
-    
-    alert('Обмен успешно завершён!');
+
+    showToast('Обмен успешно завершён!', false);
     closeTradeWindow();
     autoSave();
     refreshProfileUI();
   });
 
   socket.on('trade_cancelled', (msg) => {
-    alert(msg || 'Обмен отменён.');
+    showToast(msg || 'Обмен отменён', true);
     closeTradeWindow();
   });
 }
 
+// --- Trade Request Modal (instead of confirm()) ---
+function showTradeRequestModal(fromUsername, fromId) {
+  let rm = document.getElementById('trade-request-modal');
+  if (!rm) {
+    rm = document.createElement('div');
+    rm.id = 'trade-request-modal';
+    rm.className = 'trade-request-overlay';
+    rm.innerHTML = `
+      <div class="trade-request-box">
+        <h3>🤝 Предложение обмена</h3>
+        <p>Тренер <strong id="trade-req-username"></strong> хочет обменяться с вами!</p>
+        <div class="trade-request-buttons">
+          <button class="trade-btn accept" id="btn-trade-accept">Принять</button>
+          <button class="trade-btn reject" id="btn-trade-reject">Отклонить</button>
+        </div>
+      </div>
+    `;
+    document.body.appendChild(rm);
+  }
+
+  // Clean up previous listeners if modal was already visible
+  if (rm._cleanup) rm._cleanup();
+
+  document.getElementById('trade-req-username').textContent = fromUsername;
+  rm.style.display = 'flex';
+
+  const accept = () => {
+    socket.emit('trade_accept', fromId);
+    rm.style.display = 'none';
+    cleanup();
+  };
+  const reject = () => {
+    socket.emit('trade_reject', fromId);
+    rm.style.display = 'none';
+    cleanup();
+  };
+  const cleanup = () => {
+    document.getElementById('btn-trade-accept').removeEventListener('click', accept);
+    document.getElementById('btn-trade-reject').removeEventListener('click', reject);
+    rm.removeEventListener('click', overlayClick);
+    rm._cleanup = null;
+  };
+  const overlayClick = (e) => { if (e.target === rm) reject(); };
+
+  rm._cleanup = cleanup;
+  document.getElementById('btn-trade-accept').addEventListener('click', accept);
+  document.getElementById('btn-trade-reject').addEventListener('click', reject);
+  rm.addEventListener('click', overlayClick);
+}
+
+// --- Trade Center Modal (online players list) ---
 function openTradeCenter() {
   initTradeSocket();
   let tc = document.getElementById('trade-center-modal');
   if (!tc) {
     tc = document.createElement('div');
     tc.id = 'trade-center-modal';
-    tc.className = 'modal';
+    tc.className = 'modal-overlay';
+    tc.style.display = 'none';
     tc.innerHTML = `
-      <div class="modal-content" style="max-width: 400px;">
-        <h2 style="margin-top:0">🤝 Глобальный Обменник</h2>
-        <p style="color:var(--tma-text-muted);font-size:0.9rem;">Выберите тренера в сети, чтобы предложить обмен.</p>
-        <div id="trade-players-list" style="margin: 15px 0; max-height: 200px; overflow-y: auto; background: var(--tma-bg-secondary); border-radius: 8px; padding: 10px;"></div>
-        <button class="btn-use" style="background-color:var(--tma-accent);" onclick="document.getElementById('trade-center-modal').style.display='none'">Закрыть</button>
+      <div class="trade-container">
+        <h2 style="margin:0 0 4px 0;">🤝 Глобальный Обменник</h2>
+        <p style="color:var(--tma-text-muted);font-size:0.85rem;margin:0 0 12px 0;">Выберите тренера в сети, чтобы предложить обмен</p>
+        <div id="trade-players-list" class="trade-players-list"></div>
+        <button class="trade-btn" id="btn-trade-center-close" style="width:100%;background:var(--tma-text-muted);">Закрыть</button>
       </div>
     `;
     document.body.appendChild(tc);
+    document.getElementById('btn-trade-center-close').addEventListener('click', () => {
+      tc.style.display = 'none';
+    });
+    tc.addEventListener('click', (e) => { if (e.target === tc) tc.style.display = 'none'; });
   }
   renderTradePlayerList();
   tc.style.display = 'flex';
@@ -7667,126 +7722,207 @@ function renderTradePlayerList() {
   const list = document.getElementById('trade-players-list');
   if (!list) return;
   list.innerHTML = '';
+
   if (onlinePlayersList.length === 0) {
-    list.innerHTML = '<div style="text-align:center;color:#888;">Нет тренеров в сети</div>';
+    list.innerHTML = '<div style="text-align:center;color:var(--tma-text-muted);padding:30px 0;">Нет тренеров в сети<br><span style="font-size:0.8rem;">Подождите или зайдите позже</span></div>';
     return;
   }
-  
+
   onlinePlayersList.forEach(p => {
-    const div = document.createElement('div');
-    div.style.display = 'flex';
-    div.style.justifyContent = 'space-between';
-    div.style.alignItems = 'center';
-    div.style.padding = '10px';
-    div.style.borderBottom = '1px solid rgba(255,255,255,0.1)';
-    
-    const name = document.createElement('div');
-    name.innerText = p.username;
-    
+    const row = document.createElement('div');
+    row.className = 'trade-player-row';
+
+    const nameSpan = document.createElement('span');
+    nameSpan.className = 'trade-player-name';
+    nameSpan.textContent = p.username || 'Тренер';
+
     const btn = document.createElement('button');
-    btn.className = 'btn-use';
-    btn.style.margin = '0';
-    btn.style.padding = '5px 10px';
-    btn.innerText = 'Трейд';
+    btn.className = 'trade-btn';
+    btn.textContent = 'Трейд';
     btn.onclick = () => {
       socket.emit('trade_request', p.id);
-      alert('Запрос отправлен. Ожидайте ответа...');
+      btn.textContent = 'Отправлено ✓';
+      btn.disabled = true;
+      btn.style.opacity = '0.5';
+      btn.style.pointerEvents = 'none';
+      setTimeout(() => { btn.textContent = 'Трейд'; btn.disabled = false; btn.style.opacity = '1'; btn.style.pointerEvents = 'auto'; }, 5000);
     };
-    
-    div.appendChild(name);
-    div.appendChild(btn);
-    list.appendChild(div);
+
+    row.appendChild(nameSpan);
+    row.appendChild(btn);
+    list.appendChild(row);
   });
 }
 
+// --- Trade Window Modal (pokemon selection + confirmation) ---
 function openTradeWindow(partnerName) {
   let tw = document.getElementById('trade-window-modal');
   if (!tw) {
     tw = document.createElement('div');
     tw.id = 'trade-window-modal';
-    tw.className = 'modal';
+    tw.className = 'modal-overlay';
+    tw.style.display = 'none';
     tw.innerHTML = `
-      <div class="modal-content" style="max-width: 500px;">
-        <h2 style="margin-top:0">Обмен с <span id="trade-partner-name"></span></h2>
-        
-        <div style="display: flex; justify-content: space-between; gap: 10px; margin-bottom: 15px;">
-          <div style="flex: 1; background: var(--tma-bg-secondary); padding: 10px; border-radius: 8px; text-align: center;">
-            <h3>Вы</h3>
-            <div id="trade-my-offer" style="min-height: 100px; display: flex; align-items: center; justify-content: center; border: 1px dashed #555; margin-bottom: 10px; border-radius: 8px;">Пусто</div>
-            <button class="btn-use" id="btn-trade-select" style="margin-bottom: 10px;">Выбрать покемона</button>
-            <div id="trade-my-status" style="font-weight: bold;">⏳ Ждет</div>
+      <div class="trade-window">
+        <h2 style="margin:0 0 4px 0;">Обмен с <span id="trade-partner-name"></span></h2>
+        <p style="color:var(--tma-text-muted);font-size:0.8rem;margin:0 0 12px 0;">Выберите покемона, подтвердите — и ждите подтверждения партнёра</p>
+
+        <div class="trade-columns">
+          <div class="trade-col">
+            <h3>Вы предлагаете</h3>
+            <div class="trade-offer-slot" id="trade-my-offer"><span style="color:var(--tma-text-muted);">Не выбрано</span></div>
+            <div id="trade-my-status" class="trade-status waiting">⏳ Ожидание</div>
           </div>
-          
-          <div style="flex: 1; background: var(--tma-bg-secondary); padding: 10px; border-radius: 8px; text-align: center;">
-            <h3>Партнёр</h3>
-            <div id="trade-partner-offer" style="min-height: 100px; display: flex; align-items: center; justify-content: center; border: 1px dashed #555; margin-bottom: 10px; border-radius: 8px;">Пусто</div>
-            <div style="height: 38px;"></div> <!-- placeholder -->
-            <div id="trade-partner-status" style="font-weight: bold;">⏳ Ждет</div>
+          <div class="trade-col">
+            <h3>Партнёр предлагает</h3>
+            <div class="trade-offer-slot" id="trade-partner-offer"><span style="color:var(--tma-text-muted);">Ожидание...</span></div>
+            <div id="trade-partner-status" class="trade-status waiting">⏳ Ожидание</div>
           </div>
         </div>
-        
-        <div style="display:flex; gap: 10px;">
-          <button class="btn-use" id="btn-trade-confirm" style="background-color: #34c759; flex: 1;">Подтвердить</button>
-          <button class="btn-use" id="btn-trade-cancel" style="background-color: #ff3b30; flex: 1;">Отменить</button>
+
+        <div id="trade-pick-area">
+          <div class="trade-section-title">Выберите покемона для обмена:</div>
+          <div class="trade-pokemon-grid" id="trade-pick-grid"></div>
+        </div>
+
+        <div class="trade-actions" style="margin-top:12px;">
+          <button class="trade-btn confirm" id="btn-trade-confirm">✅ Подтвердить обмен</button>
+          <button class="trade-btn cancel" id="btn-trade-cancel">✕ Отменить</button>
         </div>
       </div>
     `;
     document.body.appendChild(tw);
-    
-    document.getElementById('btn-trade-cancel').onclick = () => {
+
+    document.getElementById('btn-trade-cancel').addEventListener('click', () => {
       if (activeTradeId) socket.emit('trade_cancel', activeTradeId);
       closeTradeWindow();
-    };
-    
-    document.getElementById('btn-trade-confirm').onclick = () => {
-      if (!myTradeOffer && !partnerTradeOffer) return alert('Оба ничего не предлагают!');
+    });
+
+    document.getElementById('btn-trade-confirm').addEventListener('click', () => {
+      if (!myTradeOffer) { showToast('Сначала выберите покемона для обмена!', true); return; }
       socket.emit('trade_confirm', activeTradeId);
-    };
-    
-    document.getElementById('btn-trade-select').onclick = () => {
-      // Let user pick a pokemon from their team
-      let teamStr = 'Кого предложить? (введите номер от 1 до 6)\n';
-      myTeam.forEach((m, i) => {
-        teamStr += `${i+1}: Lv${m.level} ${m.apiData?.name}\n`;
-      });
-      const choice = prompt(teamStr);
-      const idx = parseInt(choice) - 1;
-      if (!isNaN(idx) && myTeam[idx]) {
-        // Can't trade your last pokemon!
-        if (myTeam.length <= 1) return alert('Вы не можете отдать своего единственного покемона!');
-        
-        myTradeOffer = { type: 'pokemon', data: myTeam[idx] };
-        socket.emit('trade_offer', { tradeId: activeTradeId, offer: myTradeOffer });
-        renderTradeOffers();
-      }
-    };
+      document.getElementById('btn-trade-confirm').textContent = '✓ Ожидание партнёра...';
+      document.getElementById('btn-trade-confirm').disabled = true;
+      document.getElementById('btn-trade-confirm').style.opacity = '0.5';
+    });
+
+    tw.addEventListener('click', (e) => { if (e.target === tw) { if (activeTradeId) socket.emit('trade_cancel', activeTradeId); closeTradeWindow(); } });
   }
-  
-  document.getElementById('trade-partner-name').innerText = partnerName;
-  const myStatus = document.getElementById('trade-my-status');
-  const partnerStatus = document.getElementById('trade-partner-status');
-  if(myStatus) myStatus.innerText = '⏳ Ждет';
-  if(partnerStatus) partnerStatus.innerText = '⏳ Ждет';
-  
+
+  document.getElementById('trade-partner-name').textContent = partnerName;
+  document.getElementById('trade-my-status').textContent = '⏳ Ожидание';
+  document.getElementById('trade-my-status').className = 'trade-status waiting';
+  document.getElementById('trade-partner-status').textContent = '⏳ Ожидание';
+  document.getElementById('trade-partner-status').className = 'trade-status waiting';
+  document.getElementById('btn-trade-confirm').textContent = '✅ Подтвердить обмен';
+  document.getElementById('btn-trade-confirm').disabled = false;
+  document.getElementById('btn-trade-confirm').style.opacity = '1';
+
   renderTradeOffers();
+  renderTradePickGrid();
   document.getElementById('trade-center-modal').style.display = 'none';
   tw.style.display = 'flex';
+}
+
+function renderTradePickGrid() {
+  const grid = document.getElementById('trade-pick-grid');
+  if (!grid) return;
+  grid.innerHTML = '';
+
+  if (myTeam.length === 0) {
+    grid.innerHTML = '<div style="text-align:center;color:var(--tma-text-muted);padding:20px;grid-column:1/-1;">У вас нет покемонов для обмена</div>';
+    return;
+  }
+
+  myTeam.forEach((m, i) => {
+    const card = document.createElement('div');
+    card.className = 'trade-pokemon-card';
+    if (myTradeOffer && myTradeOffer.data === m) card.classList.add('selected');
+
+    const untradeable = myTeam.length <= 1;
+    if (untradeable) {
+      card.classList.add('untradeable');
+      card.title = 'Нельзя отдать единственного покемона';
+    }
+
+    card.innerHTML = `
+      <img src="${m.sprite || m.apiData?.sprites?.front_default || ''}" alt="${m.apiData?.name || '?'}" loading="lazy">
+      <div class="name">${m.nickname || m.apiData?.name || '???'}</div>
+      <div class="lvl">Lv${m.level || 1}</div>
+    `;
+
+    if (!untradeable) {
+      card.addEventListener('click', () => {
+        myTradeOffer = { type: 'pokemon', data: m };
+        socket.emit('trade_offer', { tradeId: activeTradeId, offer: myTradeOffer });
+        renderTradeOffers();
+        renderTradePickGrid();
+      });
+    }
+
+    grid.appendChild(card);
+  });
 }
 
 function renderTradeOffers() {
   const myDiv = document.getElementById('trade-my-offer');
   const pDiv = document.getElementById('trade-partner-offer');
-  
+
+  if (!myDiv || !pDiv) return;
+
   if (myTradeOffer && myTradeOffer.type === 'pokemon') {
-    myDiv.innerHTML = `<img src="${myTradeOffer.data.sprite}" width="60"><br>Lv${myTradeOffer.data.level} ${myTradeOffer.data.apiData?.name}`;
+    const m = myTradeOffer.data;
+    myDiv.innerHTML = `
+      <img class="trade-offer-sprite" src="${m.sprite || m.apiData?.sprites?.front_default || ''}" alt="${m.apiData?.name || '?'}">
+      <div class="trade-offer-name">${m.nickname || m.apiData?.name || '???'}</div>
+      <div class="trade-offer-level">Lv${m.level || 1}</div>
+    `;
+    myDiv.className = 'trade-offer-slot filled';
   } else {
-    myDiv.innerHTML = 'Пусто';
+    myDiv.innerHTML = '<span style="color:var(--tma-text-muted);">Не выбрано</span>';
+    myDiv.className = 'trade-offer-slot';
   }
-  
+
   if (partnerTradeOffer && partnerTradeOffer.type === 'pokemon') {
-    pDiv.innerHTML = `<img src="${partnerTradeOffer.data.sprite}" width="60"><br>Lv${partnerTradeOffer.data.level} ${partnerTradeOffer.data.apiData?.name}`;
+    const m = partnerTradeOffer.data;
+    pDiv.innerHTML = `
+      <img class="trade-offer-sprite" src="${m.sprite || m.apiData?.sprites?.front_default || ''}" alt="${m.apiData?.name || '?'}">
+      <div class="trade-offer-name">${m.nickname || m.apiData?.name || '???'}</div>
+      <div class="trade-offer-level">Lv${m.level || 1}</div>
+    `;
+    pDiv.className = 'trade-offer-slot filled';
   } else {
-    pDiv.innerHTML = 'Пусто';
+    pDiv.innerHTML = '<span style="color:var(--tma-text-muted);">Ожидание...</span>';
+    pDiv.className = 'trade-offer-slot';
+  }
+}
+
+function updateTradeConfirmUI(status) {
+  const myEl = document.getElementById('trade-my-status');
+  const partnerEl = document.getElementById('trade-partner-status');
+  if (!myEl || !partnerEl) return;
+
+  let myConfirmed, partnerConfirmed;
+  if (iAmP1) {
+    myConfirmed = status.p1;
+    partnerConfirmed = status.p2;
+  } else {
+    myConfirmed = status.p2;
+    partnerConfirmed = status.p1;
+  }
+
+  myEl.textContent = myConfirmed ? '✅ Готов' : '⏳ Ожидание';
+  myEl.className = myConfirmed ? 'trade-status ready' : 'trade-status waiting';
+
+  partnerEl.textContent = partnerConfirmed ? '✅ Готов' : '⏳ Ожидание';
+  partnerEl.className = partnerConfirmed ? 'trade-status ready' : 'trade-status waiting';
+
+  // Disable confirm button if already confirmed
+  if (myConfirmed) {
+    const btn = document.getElementById('btn-trade-confirm');
+    btn.textContent = '✓ Ожидание партнёра...';
+    btn.disabled = true;
+    btn.style.opacity = '0.5';
   }
 }
 
