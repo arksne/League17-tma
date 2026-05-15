@@ -95,10 +95,14 @@ body {
 /* App Views */
 .app-view {
   display: none;
-  animation: fadeIn 0.3s;
+  opacity: 0;
+  transform: translateY(8px);
+  transition: opacity 0.25s ease, transform 0.25s ease;
 }
 .app-view.active-view {
   display: block;
+  opacity: 1;
+  transform: translateY(0);
 }
 
 @keyframes fadeIn {
@@ -268,6 +272,16 @@ body {
   padding: 4px;
   box-sizing: border-box;
 }
+.team-sprite-wrap { position: relative; display: inline-block; }
+.train-arrow {
+  position: absolute;
+  top: 2px;
+  right: 4px;
+  font-size: 1rem;
+  filter: drop-shadow(0 1px 2px rgba(0,0,0,0.5));
+  pointer-events: none;
+}
+
 .team-slot .slot-name {
   font-weight: 600;
   font-size: 0.9rem;
@@ -1078,6 +1092,17 @@ input[type="number"] {
   font-size: 0.8rem;
   color: #ff9500;
   font-weight: bold;
+}
+.shop-qty-wrap { display: flex; align-items: center; gap: 6px; margin-top: 4px; }
+.shop-qty-input {
+  width: 48px;
+  padding: 4px 6px;
+  border: 1px solid var(--tma-border);
+  border-radius: 6px;
+  background: var(--tma-bg);
+  color: var(--tma-text);
+  text-align: center;
+  font-size: 0.85rem;
 }
 
 .shop-buy-btn {

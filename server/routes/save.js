@@ -27,7 +27,7 @@ router.get('/', async (req, res) => {
 
 router.post('/', async (req, res) => {
   try {
-    const { saveData, badgesCount = 0, teamLevelSum = 0, money = 0 } = req.body;
+    const { saveData, badgesCount = 0, teamLevelSum = 0, money = 0, pokemonCount = 0, legendaryCount = 0 } = req.body;
 
     if (typeof saveData !== 'object' || saveData === null) {
       return res.status(400).json({ error: 'saveData must be an object' });
@@ -55,17 +55,21 @@ router.post('/', async (req, res) => {
     );
 
     await db.run(
-      `INSERT INTO leaderboard (user_id, badges_count, team_level_sum, money, updated_at)
-       VALUES (?, ?, ?, ?, datetime('now'))
+      `INSERT INTO leaderboard (user_id, badges_count, team_level_sum, money, pokemon_count, legendary_count, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, datetime('now'))
        ON CONFLICT(user_id) DO UPDATE SET
          badges_count = excluded.badges_count,
          team_level_sum = excluded.team_level_sum,
          money = excluded.money,
+         pokemon_count = excluded.pokemon_count,
+         legendary_count = excluded.legendary_count,
          updated_at = datetime('now')`,
       req.userId,
       badgesCount,
       teamLevelSum,
-      money
+      money,
+      pokemonCount,
+      legendaryCount
     );
 
     const row = await db.get('SELECT updated_at FROM game_saves WHERE user_id = ?', req.userId);

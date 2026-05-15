@@ -42,6 +42,8 @@ export async function initDB() {
       badges_count INTEGER DEFAULT 0,
       team_level_sum INTEGER DEFAULT 0,
       money INTEGER DEFAULT 0,
+      pokemon_count INTEGER DEFAULT 0,
+      legendary_count INTEGER DEFAULT 0,
       updated_at TEXT DEFAULT (datetime('now')),
       FOREIGN KEY (user_id) REFERENCES users(id)
     );

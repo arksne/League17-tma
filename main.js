@@ -1427,6 +1427,18 @@ let invRawstBerry = 0;
 
 // MONEY (NEW)
 let money = 500;
+let trainerNickname = '';
+const LEGENDARY_SET = new Set([
+  'articuno', 'zapdos', 'moltres', 'mewtwo', 'mew',
+  'raikou', 'entei', 'suicune', 'lugia', 'ho-oh', 'celebi',
+  'regirock', 'regice', 'registeel', 'latias', 'latios', 'kyogre', 'groudon', 'rayquaza', 'jirachi', 'deoxys',
+  'uxie', 'mesprit', 'azelf', 'dialga', 'palkia', 'heatran', 'regigigas', 'giratina', 'cresselia', 'darkrai', 'shaymin', 'arceus',
+  'victini', 'cobalion', 'terrakion', 'virizion', 'tornadus', 'thundurus', 'reshiram', 'zekrom', 'landorus', 'kyurem', 'keldeo', 'meloetta', 'genesect',
+  'xerneas', 'yveltal', 'zygarde', 'diancie', 'hoopa', 'volcanion',
+  'type-null', 'silvally', 'tapu-koko', 'tapu-lele', 'tapu-bulu', 'tapu-fini', 'cosmog', 'cosmoem', 'solgaleo', 'lunala', 'necrozma', 'magearna', 'marshadow', 'zeraora',
+  'zacian', 'zamazenta', 'eternatus', 'kubfu', 'urshifu', 'regieleki', 'regidrago', 'glastrier', 'spectrier', 'calyrex',
+  'koraidon', 'miraidon', 'ting-lu', 'chien-pao', 'wo-chien', 'chi-yu'
+]);
 
 // BADGES (NEW)
 let badges = [];
@@ -2180,13 +2192,20 @@ function renderPCSlots(view) {
         <div class="pc-slot-info">
           <b>Lv.${mon.baseLevel + mon.candiesEaten} ${mon.name || mon.apiData?.name}</b>
           <span>HP: ${mon.currentHp}/${mon.maxHp}</span>
+          <span style="font-size:0.7rem;color:var(--tma-text-muted)">${mon.apiData?.types?.map(t => t.type.name).join('/') || ''}</span>
         </div>
         <div class="pc-slot-actions">
+          <button class="btn-use" style="background:#007aff;padding:4px 8px;" title="Инфо">ℹ</button>
           <button class="btn-use" style="background:#34c759;padding:4px 10px;">В команду</button>
           <button class="btn-use" style="background:#ff3b30;padding:4px 10px;">Отп.</button>
         </div>
       `;
-      const [btnTeam, btnRelease] = div.querySelectorAll('button');
+      const [btnInfo, btnTeam, btnRelease] = div.querySelectorAll('button');
+      btnInfo.onclick = () => {
+        const tempMon = myTeam[0]; myTeam[0] = mon;
+        openPokemonProfile(0);
+        myTeam[0] = tempMon;
+      };
       btnTeam.onclick = () => {
         if (myTeam.length >= 6) { showToast('Команда полна (6/6)! Освободите место.', true); return; }
         myTeam.push(box.splice(i, 1)[0]);
@@ -2319,7 +2338,7 @@ function saveGame() {
   const saveData = {
     currentLocationId, currentRegion,
     inventory: { ...inventory },
-    money, badges,
+    money, badges, trainerNickname,
     myTeam,
     currentPokemonIndex,
     pokedexSeen: Array.from(pokedexSeen),
@@ -2368,6 +2387,7 @@ function loadGame() {
     syncOldInventory();
     money = data.money ?? 500;
     badges = data.badges || [];
+    trainerNickname = data.trainerNickname || '';
     myTeam = data.myTeam || [];
     currentPokemonIndex = data.currentPokemonIndex ?? null;
     pokedexSeen = new Set(data.pokedexSeen || []);
@@ -2505,7 +2525,8 @@ async function giveStarterMon(pokemonName) {
       statStages: { atk: 0, def: 0, spa: 0, spd: 0, spe: 0 },
       abilityName: starterData.abilities[0]?.ability?.name || null,
       heldItem: null,
-      berries: { sitrusBerry: 0, oranBerry: 0, lumBerry: 0, chestoBerry: 0, rawstBerry: 0 }
+      berries: { sitrusBerry: 0, oranBerry: 0, lumBerry: 0, chestoBerry: 0, rawstBerry: 0 },
+      learnableMoves: []
     };
 
     const baseHp = starterData.stats[0].base_stat;
@@ -3504,6 +3525,29 @@ function pickWeightedEncounter(encountersArray) {
   return encountersArray[encountersArray.length - 1];
 }
 
+function getWildLevel() {
+  // Scale by region and location progression
+  const loc = getLocation(currentLocationId);
+  const name = (loc?.name || '').toLowerCase();
+  const id = currentLocationId || '';
+  // Victory Road / Indigo Plateau: 40-50
+  if (id.includes('victory') || id.includes('indigo')) return Math.floor(Math.random() * 11) + 40;
+  // Late-game Kanto routes: 30-40
+  if (/route_(1[7-9]|2[0-1])/.test(id) || id.includes('cinnabar') || id.includes('seafoam')) return Math.floor(Math.random() * 11) + 30;
+  // Mid-game: 20-30
+  if (/route_(1[1-6])/.test(id) || id.includes('safari') || id.includes('fuchsia') || id.includes('lavender')) return Math.floor(Math.random() * 11) + 20;
+  // Early-mid: 12-22
+  if (/route_[6-9]|10/.test(id) || id.includes('saffron') || id.includes('celadon')) return Math.floor(Math.random() * 11) + 12;
+  // Early: 8-16
+  if (/route_[3-5]/.test(id) || id.includes('mt_moon') || id.includes('cerulean')) return Math.floor(Math.random() * 9) + 8;
+  // Very early: 5-12
+  if (/route_[1-2]|22/.test(id) || id.includes('viridian') || id.includes('forest')) return Math.floor(Math.random() * 8) + 5;
+  // Starter area: 3-8
+  if (id.includes('pallet')) return Math.floor(Math.random() * 6) + 3;
+  // Default for other regions
+  return Math.floor(Math.random() * 11) + 10;
+}
+
 function getLocationEncounters() {
   const loc = getLocation(currentLocationId);
   if (!loc) return [];
@@ -3536,7 +3580,7 @@ function startAutoHunt() {
       return;
     }
     const enc = getLocationEncounters();
-    if (enc.length === 0) { stopAutoHunt(); return; }
+    if (enc.length === 0) { huntTimer = setTimeout(doTick, 5000); return; }
     // 20% base chance every tick
     if (Math.random() < 0.20) {
       const pkmName = pickWeightedEncounter(enc);
@@ -3668,7 +3712,7 @@ async function startHunt(encountersArray) {
     const res = await fetch(`https://pokeapi.co/api/v2/pokemon/${pkmName.toLowerCase()}`);
     activeWild = await res.json();
     pokedexSeen.add(activeWild.name);
-    wildLvl = presetLvl || (Math.floor(Math.random() * 11) + 5);
+    wildLvl = presetLvl || getWildLevel();
     wildStatus = null;
     wildSleepTurns = 0;
 
@@ -4225,8 +4269,6 @@ function enemyTurn() {
     return;
   }
 
-  appendToLog(`Дикий ${activeWild.name} атакует!`);
-
   let chosenMove = null;
   let chosenIdx = -1;
   for (let attempt = 0; attempt < 20; attempt++) {
@@ -4240,8 +4282,9 @@ function enemyTurn() {
     }
   }
   if (!chosenMove) {
-    chosenMove = { power: 30, damage_class: { name: 'physical' }, type: { name: 'normal' } };
+    chosenMove = { power: 30, damage_class: { name: 'physical' }, type: { name: 'normal' }, name: 'Атака' };
   }
+  const enemyMoveName = chosenMove.name || 'Атака';
   // Decrement wild PP
   if (chosenIdx >= 0 && wildMovesPP && wildMovesPP[chosenIdx]) {
     wildMovesPP[chosenIdx].current--;
@@ -4291,6 +4334,7 @@ function enemyTurn() {
     dmg = activePlayerMon.currentHp - 1;
   }
 
+  appendToLog(`Дикий ${activeWild.name} использует ${enemyMoveName}! (-${dmg} HP)`, false, 'dmg');
   activePlayerMon.currentHp -= dmg;
   if (activePlayerMon.currentHp < 0) activePlayerMon.currentHp = 0;
   updatePlayerHpUI();
@@ -4467,7 +4511,8 @@ function initEncounterEvents() {
             statStages: { atk: 0, def: 0, spa: 0, spd: 0, spe: 0 },
             abilityName: activeWild.abilities[0]?.ability?.name || null,
             heldItem: activeWild.heldItem || null,
-            berries: activeWild.berries || { sitrusBerry: 0, oranBerry: 0, lumBerry: 0, chestoBerry: 0, rawstBerry: 0 }
+            berries: activeWild.berries || { sitrusBerry: 0, oranBerry: 0, lumBerry: 0, chestoBerry: 0, rawstBerry: 0 },
+            learnableMoves: []
           };
 
           // Friend Ball: set happiness to 200
@@ -5086,8 +5131,6 @@ function enemyTurnGym() {
     return;
   }
 
-  appendToLog(`${activeWild.name} атакует!`);
-
   let chosenMove = null;
   let chosenIdx = -1;
   for (let attempt = 0; attempt < 20; attempt++) {
@@ -5100,8 +5143,9 @@ function enemyTurnGym() {
     }
   }
   if (!chosenMove) {
-    chosenMove = { power: 30, damage_class: { name: 'physical' }, type: { name: 'normal' } };
+    chosenMove = { power: 30, damage_class: { name: 'physical' }, type: { name: 'normal' }, name: 'Атака' };
   }
+  const enemyMoveName = chosenMove.name || 'Атака';
   if (chosenIdx >= 0 && wildMovesPP && wildMovesPP[chosenIdx]) {
     wildMovesPP[chosenIdx].current--;
   }
@@ -5136,6 +5180,7 @@ function enemyTurnGym() {
     appendToLog('Атака не возымела эффекта...');
   }
 
+  appendToLog(`Дикий ${activeWild.name} использует ${enemyMoveName}! (-${dmg} HP)`, false, 'dmg');
   activePlayerMon.currentHp -= dmg;
   if (activePlayerMon.currentHp < 0) activePlayerMon.currentHp = 0;
   updatePlayerHpUI();
@@ -5661,7 +5706,10 @@ function openShop() {
         <div class="shop-item-name">${item.name}</div>
         <div class="shop-item-price">¥${item.price}</div>
       </div>
-      <button class="btn-use shop-buy-btn" data-item="${item.id}">Купить</button>
+      <div class="shop-qty-wrap">
+        <input type="number" class="shop-qty-input" value="1" min="1" max="99" data-item="${item.id}">
+        <button class="btn-use shop-buy-btn" data-item="${item.id}">Купить</button>
+      </div>
     `;
     itemsContainer.appendChild(div);
   });
@@ -5681,14 +5729,21 @@ function initShopEvents() {
 
     const itemId = btn.getAttribute('data-item');
     const price = shopPrices[itemId];
+    const qtyInput = document.querySelector(`.shop-qty-input[data-item="${itemId}"]`);
+    const qty = Math.max(1, Math.min(99, parseInt(qtyInput?.value) || 1));
+    const total = price * qty;
 
-    if (money < price) return showToast('Недостаточно кредитов!', true);
+    if (money < total) return showToast('Недостаточно кредитов!', true);
 
-    money -= price;
+    money -= total;
 
-    if (!addItem(itemId)) {
-      money += price;
-      return showToast('Ошибка при покупке!', true);
+    let bought = 0;
+    for (let i = 0; i < qty; i++) {
+      if (!addItem(itemId)) {
+        money += price;
+        break;
+      }
+      bought++;
     }
 
     document.getElementById('shop-money-display').innerText = money;
@@ -5696,7 +5751,9 @@ function initShopEvents() {
     updateMoneyDisplay();
     autoSave();
 
-    showToast(`Куплено! Осталось кредитов: ¥${money}`, false);
+    if (bought > 0) {
+      showToast(bought > 1 ? `Куплено ${bought}x! Осталось: ¥${money}` : `Куплено! Осталось: ¥${money}`, false);
+    }
   });
 }
 
@@ -5731,9 +5788,17 @@ function renderTeamGrid() {
         </div>` : '';
       const types = mon.apiData.types;
       const typeBg = getTypeGradient(types);
+      const trainStage = mon.trainingStage || 0;
+      const trainColors = ['#888', '#aaa', '#8af', '#5cf', '#0cf', '#fc0', '#f80'];
+      const trainArrow = trainStage > 0
+        ? `<div class="train-arrow" style="color:${trainColors[trainStage]};" title="Тренировка: ${trainingStages[trainStage].name} (+${trainingStages[trainStage].pct}%)">▲</div>`
+        : '';
       slot.innerHTML = `
         ${reorderHtml}
-        <img src="${mon.apiData.sprites?.other?.['official-artwork']?.front_default || mon.apiData.sprites.front_default}" alt="sprite" style="background:${typeBg};">
+        <div class="team-sprite-wrap">
+          <img src="${mon.apiData.sprites?.other?.['official-artwork']?.front_default || mon.apiData.sprites.front_default}" alt="sprite" style="background:${typeBg};">
+          ${trainArrow}
+        </div>
         <div class="slot-name">${mon.nickname || mon.apiData.name} ${statusIcon}</div>
         <div class="slot-lvl">Lvl ${curLvl} | ${mon.currentHp}/${mon.maxHp} HP</div>
       `;
@@ -5813,6 +5878,42 @@ function refreshProfileUI() {
       document.getElementById(`move-${i}-name`).innerText = '-';
       document.getElementById(`move-${i}-pp`).innerText = `PP 0/0`;
     }
+  }
+
+  // Learnable moves
+  const learnableDiv = document.getElementById('content-moves');
+  let learnableHTML = '';
+  if (mon.learnableMoves && mon.learnableMoves.length > 0) {
+    learnableHTML = '<div class="learnable-section" style="margin-top:12px;"><h4 style="margin:0 0 8px;font-size:0.9rem;">📥 Резерв атак:</h4>';
+    mon.learnableMoves.forEach((lm, i) => {
+      learnableHTML += `<div class="learnable-move" style="display:flex;justify-content:space-between;align-items:center;padding:6px 8px;margin:4px 0;background:var(--tma-bg);border-radius:6px;font-size:0.85rem;">
+        <span>${lm.name} (⚡${lm.power || '?'} | ${lm.type || '?'})</span>
+        <button class="btn-use learn-btn" data-lm="${i}" style="background:#34c759;padding:3px 8px;font-size:0.75rem;">Выучить</button>
+      </div>`;
+    });
+    learnableHTML += '</div>';
+  }
+  // Add to moves tab
+  let movesContent = document.getElementById('content-moves');
+  // Remove old learnable section if exists
+  const oldSec = movesContent.querySelector('.learnable-section');
+  if (oldSec) oldSec.remove();
+  if (learnableHTML) {
+    movesContent.insertAdjacentHTML('beforeend', learnableHTML);
+    movesContent.querySelectorAll('.learn-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const idx = parseInt(btn.getAttribute('data-lm'));
+        const move = mon.learnableMoves[idx];
+        showConfirmModal('Выучить атаку?', `${move.name} (⚡${move.power}) — заменить первую атаку?`, () => {
+          if (!mon.apiData.moves[0]) mon.apiData.moves[0] = {};
+          mon.apiData.moves[0].move = { name: move.name, url: move.url };
+          mon.learnableMoves.splice(idx, 1);
+          refreshProfileUI();
+          showToast(`${move.name} выучено!`, false);
+          autoSave();
+        });
+      });
+    });
   }
 
   document.getElementById('info-lvl').innerText = curLvl;
@@ -6720,7 +6821,8 @@ async function authTelegram() {
   if (window.Telegram && window.Telegram.WebApp && window.Telegram.WebApp.initData) {
     initData = window.Telegram.WebApp.initData;
   } else {
-    initData = 'test';
+    showToast('Игра доступна только через Telegram!', true);
+    return;
   }
 
   try {
@@ -6748,7 +6850,9 @@ function getCloudAuthHeaders() {
 function getLeaderboardData() {
   const badgesCount = badges ? badges.length : 0;
   const teamLevelSum = myTeam.reduce((sum, mon) => sum + (mon.baseLevel || 1), 0);
-  return { badgesCount, teamLevelSum, money };
+  const pokemonCount = pokedexCaught.size;
+  const legendaryCount = myTeam.reduce((c, m) => c + (m.apiData?.name && LEGENDARY_SET.has(m.apiData.name) ? 1 : 0), 0);
+  return { badgesCount, teamLevelSum, money, pokemonCount, legendaryCount };
 }
 
 function cloudSave() {
@@ -6886,11 +6990,15 @@ async function openLeaderboard() {
     data.entries.forEach((entry, i) => {
       const name = entry.first_name || entry.username || 'Trainer';
       const medal = i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : `${i + 1}.`;
+      const pkmn = entry.pokemon_count || 0;
+      const leg = entry.legendary_count || 0;
       html += `
         <div class="leaderboard-entry">
           <span class="leaderboard-rank">${medal}</span>
           <span class="leaderboard-name">${name}</span>
-          <span class="leaderboard-badges">${entry.badges_count} значков</span>
+          <span class="leaderboard-badges">🏅${entry.badges_count}</span>
+          <span class="leaderboard-stat">🐾${pkmn}</span>
+          <span class="leaderboard-stat">✨${leg}</span>
           <span class="leaderboard-money">¥${entry.money || 0}</span>
         </div>`;
     });
@@ -7234,7 +7342,11 @@ function offerLearnMove(pokemon, move) {
       appendToLog(`${monName} забыл ${oldMove} и выучил ${moveName}!`, false, 'system');
       resolve(true);
     }, () => {
-      appendToLog(`${monName} не стал учить ${moveName}.`, false, 'system');
+      appendToLog(`${monName} не стал учить ${moveName}. Атака сохранена в резерв.`, false, 'system');
+      if (!pokemon.learnableMoves) pokemon.learnableMoves = [];
+      if (!pokemon.learnableMoves.some(m => m.name === moveName)) {
+        pokemon.learnableMoves.push({ name: moveName, url: move.url || '', power: move.power || 0, type: move.type?.name || 'normal' });
+      }
       resolve(false);
     });
   });
@@ -7565,11 +7677,22 @@ function renderTrainerCard() {
   const caughtEl = document.getElementById('trainer-caught');
   const teamEl = document.getElementById('trainer-team');
 
-  if (tgUser && tgUser.first_name) {
+  if (trainerNickname) {
+    nameEl.innerText = trainerNickname;
+    nameEl.style.cursor = 'pointer';
+    nameEl.title = 'Нажмите чтобы изменить прозвище';
+  } else if (tgUser && tgUser.first_name) {
     nameEl.innerText = tgUser.first_name;
   } else {
     nameEl.innerText = 'Test Тренер';
   }
+  nameEl.onclick = () => {
+    showTextInputModal('Прозвище тренера', trainerNickname || tgUser?.first_name || '', (newName) => {
+      trainerNickname = newName;
+      renderTrainerCard();
+      autoSave();
+    });
+  };
 
   moneyEl.innerText = `¥${money}`;
   badgesEl.innerText = badges.length;

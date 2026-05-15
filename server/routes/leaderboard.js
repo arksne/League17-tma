@@ -8,7 +8,8 @@ router.get('/', async (req, res) => {
     const db = getDB();
     const entries = await db.all(
       `SELECT u.username, u.first_name,
-              l.badges_count, l.team_level_sum, l.money, l.updated_at
+              l.badges_count, l.team_level_sum, l.money,
+              l.pokemon_count, l.legendary_count, l.updated_at
        FROM leaderboard l
        JOIN users u ON u.id = l.user_id
        ORDER BY l.badges_count DESC, l.team_level_sum DESC, l.money DESC

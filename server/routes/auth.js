@@ -13,24 +13,17 @@ router.post('/tg', async (req, res) => {
     const isRealInitData = initData && initData !== 'test';
     let tgUser;
 
-    if (isRealInitData) {
-      // Real Telegram initData received
-      if (!botToken) {
-        console.error('BOT_TOKEN is not set in environment variables!');
-        return res.status(500).json({ error: 'Server misconfiguration: BOT_TOKEN not set' });
-      }
-      tgUser = verifyTelegramInitData(initData, botToken);
-      if (!tgUser) {
-        return res.status(403).json({ error: 'Invalid Telegram init data' });
-      }
-    } else {
-      // No real initData — dev/test mode only
-      if (!isDevMode) {
-        // BOT_TOKEN is set but no initData — reject
-        return res.status(403).json({ error: 'Missing Telegram init data' });
-      }
-      console.warn('⚠️  Using test user (dev mode — no BOT_TOKEN set)');
-      tgUser = parseTestUser();
+    // Require valid Telegram initData for all access
+    if (!isRealInitData) {
+      return res.status(403).json({ error: 'Telegram authentication required' });
+    }
+    if (!botToken) {
+      console.error('BOT_TOKEN is not set in environment variables!');
+      return res.status(500).json({ error: 'Server misconfiguration' });
+    }
+    tgUser = verifyTelegramInitData(initData, botToken);
+    if (!tgUser) {
+      return res.status(403).json({ error: 'Invalid Telegram init data' });
     }
 
     const db = getDB();
