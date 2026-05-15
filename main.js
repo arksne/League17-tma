@@ -5953,6 +5953,12 @@ function refreshProfileUI() {
     }
   }
 
+  // Auto-fetch learnable moves from PokeAPI (once per pokemon)
+  if (!mon._learnableFetched && mon.apiData?.id) {
+    mon._learnableFetched = true;
+    fetchLearnableMoves(mon);
+  }
+
   // Learnable moves
   const learnableDiv = document.getElementById('content-moves');
   let learnableHTML = '';
@@ -7465,6 +7471,37 @@ function offerLearnMove(pokemon, move) {
 // ================================================================
 // FEATURE: TM MOVE RELEARNER
 // ================================================================
+async function fetchLearnableMoves(mon) {
+  try {
+    const res = await fetch(`https://pokeapi.co/api/v2/pokemon/${mon.apiData.id}`);
+    const data = await res.json();
+    const allMoves = (data.moves || []).slice(0, 100);
+    const knownNames = new Set((mon.apiData.moves || []).filter(m => m).map(m => m.move.name));
+    const existingNames = new Set((mon.learnableMoves || []).map(m => m.name));
+    if (!mon.learnableMoves) mon.learnableMoves = [];
+
+    for (const entry of allMoves) {
+      const name = entry.move.name;
+      if (knownNames.has(name) || existingNames.has(name)) continue;
+      try {
+        const moveRes = await fetch(entry.move.url);
+        const moveData = await moveRes.json();
+        if (moveData.power && moveData.power > 0) {
+          mon.learnableMoves.push({
+            name: moveData.name,
+            url: entry.move.url,
+            power: moveData.power,
+            type: moveData.type?.name || 'normal'
+          });
+        }
+      } catch (e) { /* skip failed moves */ }
+      if (mon.learnableMoves.length >= 50) break;
+    }
+    refreshProfileUI();
+    autoSave();
+  } catch (e) { console.warn('fetchLearnableMoves failed', e); }
+}
+
 async function openMoveRelearner() {
   if (currentPokemonIndex === null) return showToast('Сначала выберите покемона во вкладке "Команда"!', true);
   if (getItemQty('tm') <= 0) return showToast('У вас нет TM-совместимости!', true);
@@ -8122,6 +8159,132 @@ function showItemInfoModal(item, qty) {
   modal.addEventListener('click', onOverlay);
 }
 
+// --- PvP Battle ---
+let pvpBattleId = null;
+let pvpOpponentName = '';
+let pvpActiveMon = null;
+let pvpOpponentMon = null;
+let pvpMyTurn = false;
+
+function openPvPArena(battleId, opponent, isFirst) {
+  pvpBattleId = battleId;
+  pvpOpponentName = opponent;
+  pvpMyTurn = isFirst;
+  const alive = myTeam.find(m => m.currentHp > 0);
+  if (!alive) { showToast('Нет живых покемонов!', true); return; }
+  pvpActiveMon = alive;
+
+  let modal = document.getElementById('pvp-modal');
+  if (!modal) {
+    modal = document.createElement('div');
+    modal.id = 'pvp-modal';
+    modal.className = 'modal-overlay';
+    modal.style.display = 'none';
+    modal.innerHTML = `
+      <div class="reborn-battle-arena" style="max-width:420px;width:95%;">
+        <div style="text-align:center;padding:8px;">
+          <span id="pvp-opponent-name" style="font-weight:bold;"></span>
+          <span id="pvp-turn-indicator" style="color:var(--tma-text-muted);margin-left:8px;"></span>
+        </div>
+        <div class="reborn-pokemon-row">
+          <div class="reborn-side-panel">
+            <div class="reborn-poke-header"><span id="pvp-my-name"></span> <span id="pvp-my-lvl"></span></div>
+            <div class="reborn-hp-bar"><div class="reborn-hp-fill" id="pvp-my-hp-fill"></div></div>
+            <div class="reborn-hp-text" id="pvp-my-hp"></div>
+            <div class="reborn-sprite-box"><img class="reborn-sprite" id="pvp-my-sprite" src=""></div>
+          </div>
+          <div class="reborn-side-panel">
+            <div class="reborn-poke-header"><span id="pvp-opp-name"></span> <span id="pvp-opp-lvl"></span></div>
+            <div class="reborn-hp-bar"><div class="reborn-hp-fill" id="pvp-opp-hp-fill"></div></div>
+            <div class="reborn-hp-text" id="pvp-opp-hp"></div>
+            <div class="reborn-sprite-box"><img class="reborn-sprite" id="pvp-opp-sprite" src=""></div>
+          </div>
+        </div>
+        <div class="reborn-center-panel">
+          <div class="reborn-moves" id="pvp-moves"></div>
+          <div class="reborn-log-container"><div class="reborn-battle-log" id="pvp-log"></div></div>
+        </div>
+        <button class="tma-btn" id="btn-pvp-leave" style="width:100%;margin-top:8px;">Покинуть бой</button>
+      </div>
+    `;
+    document.body.appendChild(modal);
+    document.getElementById('btn-pvp-leave').addEventListener('click', () => {
+      modal.style.display = 'none';
+      socket.emit('pvp_end', { battleId: pvpBattleId, action: { type: 'surrender' } });
+      pvpBattleId = null;
+      autoSave();
+    });
+  }
+
+  document.getElementById('pvp-opponent-name').textContent = `⚔ ${opponent}`;
+  updatePvPUI();
+  modal.style.display = 'flex';
+}
+
+function updatePvPUI() {
+  if (!pvpActiveMon) return;
+  const mon = pvpActiveMon;
+  const curLvl = mon.baseLevel + (mon.candiesEaten || 0);
+  document.getElementById('pvp-my-name').textContent = mon.nickname || mon.apiData?.name;
+  document.getElementById('pvp-my-lvl').textContent = `Lv${curLvl}`;
+  document.getElementById('pvp-my-hp').textContent = `${mon.currentHp}/${mon.maxHp}`;
+  document.getElementById('pvp-my-hp-fill').style.width = `${(mon.currentHp / mon.maxHp) * 100}%`;
+  const sprite = mon.apiData?.sprites?.other?.['official-artwork']?.front_default || mon.apiData?.sprites?.front_default || '';
+  document.getElementById('pvp-my-sprite').src = sprite;
+
+  const turnEl = document.getElementById('pvp-turn-indicator');
+  turnEl.textContent = pvpMyTurn ? '🎯 Ваш ход!' : '⏳ Ход соперника...';
+  turnEl.style.color = pvpMyTurn ? '#34c759' : 'var(--tma-text-muted)';
+
+  // Render move buttons
+  const movesDiv = document.getElementById('pvp-moves');
+  movesDiv.innerHTML = '';
+  const moves = mon.apiData?.moves?.filter(m => m) || [];
+  moves.forEach((m, i) => {
+    const btn = document.createElement('span');
+    btn.className = 'reborn-move-link';
+    btn.textContent = m.move.name;
+    btn.onclick = () => {
+      if (!pvpMyTurn) { showToast('Сейчас ход соперника!', true); return; }
+      doPvPAttack(i);
+    };
+    movesDiv.appendChild(btn);
+  });
+  if (moves.length === 0) movesDiv.innerHTML = '<span style="color:var(--tma-text-muted)">Нет атак</span>';
+}
+
+function doPvPAttack(moveIdx) {
+  if (!pvpActiveMon || !pvpOpponentMon || !pvpBattleId) return;
+  const move = pvpActiveMon.apiData.moves?.[moveIdx]?.move;
+  const moveName = move?.name || 'Атака';
+  const power = 60;
+  const dmg = Math.floor(((pvpActiveMon.baseLevel + (pvpActiveMon.candiesEaten || 0)) * power / 20) * (0.8 + Math.random() * 0.4));
+  const crit = Math.random() < 0.1;
+
+  pvpOpponentMon.currentHp -= crit ? dmg * 2 : dmg;
+  if (pvpOpponentMon.currentHp < 0) pvpOpponentMon.currentHp = 0;
+
+  pvpMyTurn = false;
+  const logEl = document.getElementById('pvp-log');
+  logEl.innerHTML = `${monName()} использует ${moveName}! ${crit ? '💥Крит! ' : ''}(-${crit ? dmg * 2 : dmg} HP)\n${logEl.innerHTML}`;
+
+  socket.emit('pvp_action', { battleId: pvpBattleId, action: { type: 'attack', moveIdx, dmg: crit ? dmg * 2 : dmg, crit } });
+  updatePvPUI();
+  if (pvpOpponentMon.currentHp <= 0) endPvP(true);
+}
+
+function monName() { return pvpActiveMon?.nickname || pvpActiveMon?.apiData?.name || '???'; }
+
+function endPvP(won) {
+  showToast(won ? 'Победа в PvP!' : 'Поражение в PvP...', !won);
+  if (won) money += 500;
+  document.getElementById('pvp-modal').style.display = 'none';
+  socket.emit('pvp_end', { battleId: pvpBattleId, action: { type: won ? 'win' : 'lose' } });
+  pvpBattleId = null;
+  autoSave();
+  renderTrainerCard();
+}
+
 function initTradeSocket() {
   if (socket) return;
   const serverUrl = window.location.hostname === 'localhost' ? 'http://localhost:3000' : API_BASE.replace('/api', '');
@@ -8170,17 +8333,28 @@ function initTradeSocket() {
   });
 
   socket.on('trade_execute', (receivedOffer) => {
-    if (myTradeOffer && myTradeOffer.type === 'pokemon') {
-      const idx = myTeam.findIndex(m => m.uid === myTradeOffer.data.uid || m === myTradeOffer.data);
-      if (idx !== -1) myTeam.splice(idx, 1);
+    // Remove what I offered
+    if (myTradeOffer) {
+      if (myTradeOffer.type === 'pokemon') {
+        const idx = myTeam.findIndex(m => m.uid === myTradeOffer.data.uid || m === myTradeOffer.data);
+        if (idx !== -1) myTeam.splice(idx, 1);
+      } else if (myTradeOffer.type === 'item') {
+        removeItem(myTradeOffer.data.id, myTradeOffer.data.qty || 1);
+      }
     }
 
-    if (receivedOffer && receivedOffer.type === 'pokemon') {
-      receivedOffer.data.previousOwner = receivedOffer.data.originalTrainer;
-      receivedOffer.data.uid = generateUID();
-      receivedOffer.data.originalTrainer = getTrainerId();
-      receivedOffer.data.createdAt = Date.now();
-      myTeam.push(receivedOffer.data);
+    // Receive what partner offered
+    if (receivedOffer) {
+      if (receivedOffer.type === 'pokemon') {
+        receivedOffer.data.previousOwner = receivedOffer.data.originalTrainer;
+        receivedOffer.data.uid = generateUID();
+        receivedOffer.data.originalTrainer = getTrainerId();
+        receivedOffer.data.createdAt = Date.now();
+        myTeam.push(receivedOffer.data);
+      } else if (receivedOffer.type === 'item') {
+        addItem(receivedOffer.data.id, receivedOffer.data.qty || 1);
+        showToast(`Получено: ${receivedOffer.data.name} x${receivedOffer.data.qty || 1}!`, false);
+      }
     }
 
     showToast('Обмен успешно завершён!', false);
@@ -8192,6 +8366,56 @@ function initTradeSocket() {
   socket.on('trade_cancelled', (msg) => {
     showToast(msg || 'Обмен отменён', true);
     closeTradeWindow();
+  });
+
+  // PvP handlers
+  socket.on('pvp_challenge_received', (data) => {
+    showConfirmModal('⚔ Вызов на бой!', `Тренер ${data.fromName} вызывает вас на битву!`, () => {
+      if (myTeam.length === 0 || !myTeam.some(m => m.currentHp > 0)) {
+        showToast('Нужен хотя бы один живой покемон!', true);
+        socket.emit('pvp_decline', data.fromId);
+        return;
+      }
+      socket.emit('pvp_accept', data.fromId);
+    }, () => { socket.emit('pvp_decline', data.fromId); });
+  });
+
+  socket.on('pvp_declined', (data) => {
+    showToast(`${data.fromName} отклонил вызов`, true);
+  });
+
+  socket.on('pvp_start', (data) => {
+    openPvPArena(data.battleId, data.opponent, false);
+    showToast(`Бой с ${data.opponent}! Выберите покемона и нажмите Готов`, false);
+  });
+
+  socket.on('pvp_begin', (data) => {
+    pvpMyTurn = data.first;
+    // Setup opponent mon (dummy based on first alive)
+    if (!pvpOpponentMon) pvpOpponentMon = { name: pvpOpponentName, currentHp: 200, maxHp: 200, baseLevel: myTeam[0]?.baseLevel || 50 };
+    socket.emit('pvp_ready', { battleId: pvpBattleId });
+    updatePvPUI();
+    document.getElementById('pvp-log').innerHTML = 'Бой начался!\n';
+  });
+
+  socket.on('pvp_opponent_action', (action) => {
+    if (action.type === 'attack') {
+      pvpActiveMon.currentHp -= action.dmg || 0;
+      if (pvpActiveMon.currentHp < 0) pvpActiveMon.currentHp = 0;
+      const logEl = document.getElementById('pvp-log');
+      logEl.innerHTML = `${pvpOpponentName} атакует! ${action.crit ? '💥Крит! ' : ''}(-${action.dmg} HP)\n${logEl.innerHTML}`;
+      pvpMyTurn = true;
+      updatePvPUI();
+      if (pvpActiveMon.currentHp <= 0) endPvP(false);
+    }
+    if (action.type === 'surrender') {
+      showToast('Соперник сдался! Победа!', false);
+      document.getElementById('pvp-modal').style.display = 'none';
+      pvpBattleId = null;
+    }
+    if (action.type === 'win') {
+      showToast('Соперник победил!', true);
+    }
   });
 }
 
@@ -8290,20 +8514,40 @@ function renderTradePlayerList() {
     nameSpan.className = 'trade-player-name';
     nameSpan.textContent = p.username || 'Тренер';
 
-    const btn = document.createElement('button');
-    btn.className = 'trade-btn';
-    btn.textContent = 'Трейд';
-    btn.onclick = () => {
+    const btnWrap = document.createElement('div');
+    btnWrap.style.cssText = 'display:flex;gap:4px;';
+
+    const tradeBtn = document.createElement('button');
+    tradeBtn.className = 'trade-btn';
+    tradeBtn.textContent = 'Трейд';
+    tradeBtn.onclick = () => {
       socket.emit('trade_request', p.id);
-      btn.textContent = 'Отправлено ✓';
-      btn.disabled = true;
-      btn.style.opacity = '0.5';
-      btn.style.pointerEvents = 'none';
-      setTimeout(() => { btn.textContent = 'Трейд'; btn.disabled = false; btn.style.opacity = '1'; btn.style.pointerEvents = 'auto'; }, 5000);
+      tradeBtn.textContent = '✓';
+      tradeBtn.disabled = true;
+      tradeBtn.style.opacity = '0.5';
+      setTimeout(() => { tradeBtn.textContent = 'Трейд'; tradeBtn.disabled = false; tradeBtn.style.opacity = '1'; }, 5000);
     };
 
+    const battleBtn = document.createElement('button');
+    battleBtn.className = 'trade-btn';
+    battleBtn.style.background = '#ff3b30';
+    battleBtn.textContent = '⚔';
+    battleBtn.onclick = () => {
+      if (myTeam.length === 0 || !myTeam.some(m => m.currentHp > 0)) {
+        showToast('Нужен хотя бы один живой покемон!', true);
+        return;
+      }
+      socket.emit('pvp_challenge', p.id);
+      battleBtn.textContent = '✓';
+      battleBtn.disabled = true;
+      battleBtn.style.opacity = '0.5';
+      setTimeout(() => { battleBtn.textContent = '⚔'; battleBtn.disabled = false; battleBtn.style.opacity = '1'; }, 5000);
+    };
+
+    btnWrap.appendChild(tradeBtn);
+    btnWrap.appendChild(battleBtn);
     row.appendChild(nameSpan);
-    row.appendChild(btn);
+    row.appendChild(btnWrap);
     list.appendChild(row);
   });
 }
@@ -8319,12 +8563,13 @@ function openTradeWindow(partnerName) {
     tw.innerHTML = `
       <div class="trade-window">
         <h2 style="margin:0 0 4px 0;">Обмен с <span id="trade-partner-name"></span></h2>
-        <p style="color:var(--tma-text-muted);font-size:0.8rem;margin:0 0 12px 0;">Выберите покемона, подтвердите — и ждите подтверждения партнёра</p>
+        <p style="color:var(--tma-text-muted);font-size:0.8rem;margin:0 0 12px 0;">Выберите покемона или предмет — можно дарить без возврата</p>
 
         <div class="trade-columns">
           <div class="trade-col">
             <h3>Вы предлагаете</h3>
             <div class="trade-offer-slot" id="trade-my-offer"><span style="color:var(--tma-text-muted);">Не выбрано</span></div>
+            <button class="trade-btn cancel" id="btn-trade-clear-my" style="width:100%;padding:4px;font-size:0.7rem;margin-bottom:4px;">Очистить</button>
             <div id="trade-my-status" class="trade-status waiting">⏳ Ожидание</div>
           </div>
           <div class="trade-col">
@@ -8335,8 +8580,10 @@ function openTradeWindow(partnerName) {
         </div>
 
         <div id="trade-pick-area">
-          <div class="trade-section-title">Выберите покемона для обмена:</div>
+          <div class="trade-section-title">🐾 Покемоны:</div>
           <div class="trade-pokemon-grid" id="trade-pick-grid"></div>
+          <div class="trade-section-title" style="margin-top:10px;">🎒 Предметы:</div>
+          <div class="trade-pokemon-grid" id="trade-item-grid" style="grid-template-columns: repeat(4, 1fr);"></div>
         </div>
 
         <div class="trade-actions" style="margin-top:12px;">
@@ -8353,11 +8600,22 @@ function openTradeWindow(partnerName) {
     });
 
     document.getElementById('btn-trade-confirm').addEventListener('click', () => {
-      if (!myTradeOffer) { showToast('Сначала выберите покемона для обмена!', true); return; }
+      // Allow one-way: can confirm if you offered something OR partner offered something
+      if (!myTradeOffer && !partnerTradeOffer) { showToast('Выберите что-то для обмена или дождитесь предложения!', true); return; }
       socket.emit('trade_confirm', activeTradeId);
       document.getElementById('btn-trade-confirm').textContent = '✓ Ожидание партнёра...';
       document.getElementById('btn-trade-confirm').disabled = true;
       document.getElementById('btn-trade-confirm').style.opacity = '0.5';
+    });
+
+    document.getElementById('btn-trade-clear-my').addEventListener('click', () => {
+      myTradeOffer = null;
+      socket.emit('trade_offer', { tradeId: activeTradeId, offer: null });
+      renderTradeOffers();
+      renderTradePickGrid();
+      document.getElementById('btn-trade-confirm').textContent = '✅ Подтвердить обмен';
+      document.getElementById('btn-trade-confirm').disabled = false;
+      document.getElementById('btn-trade-confirm').style.opacity = '1';
     });
 
     tw.addEventListener('click', (e) => { if (e.target === tw) { if (activeTradeId) socket.emit('trade_cancel', activeTradeId); closeTradeWindow(); } });
@@ -8374,6 +8632,7 @@ function openTradeWindow(partnerName) {
 
   renderTradeOffers();
   renderTradePickGrid();
+  renderTradeItemGrid();
   document.getElementById('trade-center-modal').style.display = 'none';
   tw.style.display = 'flex';
 }
@@ -8418,37 +8677,68 @@ function renderTradePickGrid() {
   });
 }
 
+function renderTradeItemGrid() {
+  const grid = document.getElementById('trade-item-grid');
+  if (!grid) return;
+  grid.innerHTML = '';
+
+  const tradeItems = ITEMS.filter(item => (inventory[item.id] || 0) > 0 && item.isUsable && item.implemented !== false);
+  if (tradeItems.length === 0) {
+    grid.innerHTML = '<div style="text-align:center;color:var(--tma-text-muted);padding:10px;grid-column:1/-1;font-size:0.8rem;">Нет предметов</div>';
+    return;
+  }
+
+  tradeItems.forEach(item => {
+    const qty = inventory[item.id] || 0;
+    const card = document.createElement('div');
+    card.className = 'trade-pokemon-card';
+    if (myTradeOffer && myTradeOffer.type === 'item' && myTradeOffer.data.id === item.id) card.classList.add('selected');
+
+    card.innerHTML = `
+      <div>${getItemSpriteImg(item.id, 32)}</div>
+      <div class="name">${item.nameRu}</div>
+      <div class="lvl">x${Math.min(qty, 99)}</div>
+    `;
+
+    card.addEventListener('click', () => {
+      // Toggle: if already selected, clear; else select this item
+      if (myTradeOffer && myTradeOffer.type === 'item' && myTradeOffer.data.id === item.id) {
+        myTradeOffer = null;
+      } else {
+        myTradeOffer = { type: 'item', data: { id: item.id, name: item.nameRu, qty: 1 } };
+      }
+      socket.emit('trade_offer', { tradeId: activeTradeId, offer: myTradeOffer });
+      renderTradeOffers();
+      renderTradeItemGrid();
+      renderTradePickGrid();
+    });
+
+    grid.appendChild(card);
+  });
+}
+
 function renderTradeOffers() {
   const myDiv = document.getElementById('trade-my-offer');
   const pDiv = document.getElementById('trade-partner-offer');
-
   if (!myDiv || !pDiv) return;
 
-  if (myTradeOffer && myTradeOffer.type === 'pokemon') {
-    const m = myTradeOffer.data;
-    myDiv.innerHTML = `
-      <img class="trade-offer-sprite" src="${m.sprite || m.apiData?.sprites?.front_default || ''}" alt="${m.apiData?.name || '?'}">
-      <div class="trade-offer-name">${m.nickname || m.apiData?.name || '???'}</div>
-      <div class="trade-offer-level">Lv${m.level || 1}</div>
-    `;
-    myDiv.className = 'trade-offer-slot filled';
-  } else {
-    myDiv.innerHTML = '<span style="color:var(--tma-text-muted);">Не выбрано</span>';
-    myDiv.className = 'trade-offer-slot';
-  }
+  const renderOffer = (offer) => {
+    if (!offer) return '<span style="color:var(--tma-text-muted);">Не выбрано</span>';
+    if (offer.type === 'pokemon') {
+      const m = offer.data;
+      return `<img class="trade-offer-sprite" src="${m.sprite || m.apiData?.sprites?.front_default || ''}" alt="${m.apiData?.name || '?'}"><div class="trade-offer-name">${m.nickname || m.apiData?.name || '???'}</div><div class="trade-offer-level">Lv${m.level || 1}</div>`;
+    }
+    if (offer.type === 'item') {
+      const it = offer.data;
+      return `<div>${getItemSpriteImg(it.id, 40)}</div><div class="trade-offer-name">${it.name}</div><div class="trade-offer-level">x${it.qty || 1}</div>`;
+    }
+    return '<span style="color:var(--tma-text-muted);">Не выбрано</span>';
+  };
 
-  if (partnerTradeOffer && partnerTradeOffer.type === 'pokemon') {
-    const m = partnerTradeOffer.data;
-    pDiv.innerHTML = `
-      <img class="trade-offer-sprite" src="${m.sprite || m.apiData?.sprites?.front_default || ''}" alt="${m.apiData?.name || '?'}">
-      <div class="trade-offer-name">${m.nickname || m.apiData?.name || '???'}</div>
-      <div class="trade-offer-level">Lv${m.level || 1}</div>
-    `;
-    pDiv.className = 'trade-offer-slot filled';
-  } else {
-    pDiv.innerHTML = '<span style="color:var(--tma-text-muted);">Ожидание...</span>';
-    pDiv.className = 'trade-offer-slot';
-  }
+  myDiv.innerHTML = renderOffer(myTradeOffer);
+  myDiv.className = myTradeOffer ? 'trade-offer-slot filled' : 'trade-offer-slot';
+  pDiv.innerHTML = renderOffer(partnerTradeOffer);
+  pDiv.className = partnerTradeOffer ? 'trade-offer-slot filled' : 'trade-offer-slot';
 }
 
 function updateTradeConfirmUI(status) {

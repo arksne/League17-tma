@@ -97,6 +97,54 @@ export function initSocket(server, allowedOrigin) {
       }
     });
 
+    // --- PvP Battle System ---
+    const pvpBattles = new Map(); // battleId -> { p1, p2, p1Mon, p2Mon, turn, log }
+
+    socket.on('pvp_challenge', (targetId) => {
+      const challenger = onlinePlayers.get(socket.id);
+      if (challenger && onlinePlayers.has(targetId)) {
+        io.to(targetId).emit('pvp_challenge_received', { fromId: socket.id, fromName: challenger.username });
+      }
+    });
+
+    socket.on('pvp_accept', (fromId) => {
+      const battleId = `${fromId}-${socket.id}-${Date.now()}`;
+      pvpBattles.set(battleId, { p1: fromId, p2: socket.id, p1Ready: false, p2Ready: false, turn: 0, log: [] });
+      io.to(fromId).emit('pvp_start', { battleId, opponent: onlinePlayers.get(socket.id)?.username });
+      io.to(socket.id).emit('pvp_start', { battleId, opponent: onlinePlayers.get(fromId)?.username });
+    });
+
+    socket.on('pvp_ready', (data) => {
+      const battle = pvpBattles.get(data.battleId);
+      if (!battle) return;
+      if (battle.p1 === socket.id) battle.p1Ready = true;
+      if (battle.p2 === socket.id) battle.p2Ready = true;
+      if (battle.p1Ready && battle.p2Ready) {
+        io.to(battle.p1).emit('pvp_begin', { first: true });
+        io.to(battle.p2).emit('pvp_begin', { first: false });
+      }
+    });
+
+    socket.on('pvp_action', (data) => {
+      const battle = pvpBattles.get(data.battleId);
+      if (!battle) return;
+      const opponent = battle.p1 === socket.id ? battle.p2 : battle.p1;
+      io.to(opponent).emit('pvp_opponent_action', data.action);
+    });
+
+    socket.on('pvp_end', (data) => {
+      const battle = pvpBattles.get(data.battleId);
+      if (battle) {
+        const opponent = battle.p1 === socket.id ? battle.p2 : battle.p1;
+        io.to(opponent).emit('pvp_opponent_action', data.action);
+        pvpBattles.delete(data.battleId);
+      }
+    });
+
+    socket.on('pvp_decline', (fromId) => {
+      io.to(fromId).emit('pvp_declined', { fromName: onlinePlayers.get(socket.id)?.username });
+    });
+
     socket.on('disconnect', () => {
       onlinePlayers.delete(socket.id);
       io.emit('online_players', Array.from(onlinePlayers.entries()).map(([id, info]) => ({ id, ...info })));
