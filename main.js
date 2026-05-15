@@ -1813,6 +1813,9 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   await authTelegram();
 
+  // Update trainer card after auth
+  renderTrainerCard();
+
   // Reset button — admin only
   const resetBtn = document.getElementById('btn-reset-game');
   if (resetBtn) {
@@ -7745,13 +7748,13 @@ function renderTrainerCard() {
 
   if (trainerNickname) {
     nameEl.innerText = trainerNickname;
-    nameEl.style.cursor = 'pointer';
-    nameEl.title = 'Нажмите чтобы изменить прозвище';
-  } else if (tgUser && tgUser.first_name) {
-    nameEl.innerText = tgUser.first_name;
+  } else if (tgUser) {
+    nameEl.innerText = tgUser.first_name || tgUser.username || `ID:${tgUser.id}`;
   } else {
-    nameEl.innerText = 'Test Тренер';
+    nameEl.innerText = 'Загрузка...';
   }
+  nameEl.style.cursor = 'pointer';
+  nameEl.title = 'Нажмите чтобы изменить прозвище';
   nameEl.onclick = () => {
     showTextInputModal('Прозвище тренера', trainerNickname || tgUser?.first_name || '', (newName) => {
       trainerNickname = newName;
