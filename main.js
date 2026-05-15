@@ -2115,6 +2115,44 @@ function collectDaycareMons() {
 }
 
 // --- PC STORAGE ---
+function showPCInfoModal(mon) {
+  const curLvl = mon.baseLevel + (mon.candiesEaten || 0);
+  const types = mon.apiData?.types?.map(t => t.type.name).join(', ') || '?';
+  const ability = mon.abilityName || mon.apiData?.abilities?.[0]?.ability?.name || '-';
+  const sprite = mon.apiData?.sprites?.other?.['official-artwork']?.front_default || mon.apiData?.sprites?.front_default || '';
+  const moves = (mon.apiData?.moves || []).filter(m => m).map(m => m.move.name).join(', ') || 'Нет атак';
+  const ivs = mon.ivs || {};
+
+  const modal = document.createElement('div');
+  modal.className = 'modal-overlay';
+  modal.style.display = 'flex';
+  modal.innerHTML = `
+    <div class="selection-modal-card" style="text-align:center;">
+      <img src="${sprite}" style="width:96px;height:96px;image-rendering:pixelated;" onerror="this.style.display='none'">
+      <h3 style="margin:8px 0;">${mon.nickname || mon.apiData?.name || '???'} <span style="color:var(--tma-text-muted);">Lv.${curLvl}</span></h3>
+      <p style="color:var(--tma-text-muted);margin:4px 0;">Тип: ${types} | Способность: ${ability}</p>
+      <p style="margin:4px 0;">HP: ${mon.currentHp}/${mon.maxHp} | Статус: ${getStatusIcon(mon.status) || 'нет'}</p>
+      <div style="font-size:0.8rem;color:var(--tma-text-muted);margin:8px 0;">
+        <b>IV:</b> HP:${ivs.hp||0} АТК:${ivs.atk||0} ЗАЩ:${ivs.def||0} СП.АТК:${ivs.spa||0} СП.ЗАЩ:${ivs.spd||0} СКОР:${ivs.spe||0}
+      </div>
+      <p style="font-size:0.8rem;color:var(--tma-text-muted);">Атаки: ${moves}</p>
+      ${mon.trainingStage > 0 ? `<p style="font-size:0.8rem;color:#fc0;">Тренировка: ${trainingStages[mon.trainingStage].name} (+${trainingStages[mon.trainingStage].pct}%)</p>` : ''}
+      <button class="tma-btn" id="btn-pc-info-close" style="width:100%;margin-top:12px;">Закрыть</button>
+    </div>
+  `;
+  document.body.appendChild(modal);
+
+  const cleanup = () => {
+    document.getElementById('btn-pc-info-close')?.removeEventListener('click', cleanup);
+    modal.removeEventListener('click', onOverlay);
+    if (modal.parentNode) modal.parentNode.removeChild(modal);
+  };
+  const onOverlay = (e) => { if (e.target === modal) cleanup(); };
+
+  document.getElementById('btn-pc-info-close').addEventListener('click', cleanup);
+  modal.addEventListener('click', onOverlay);
+}
+
 function openPC() {
   const modal = document.getElementById('pc-modal');
   const tabsContainer = document.getElementById('pc-tabs');
@@ -2202,9 +2240,7 @@ function renderPCSlots(view) {
       `;
       const [btnInfo, btnTeam, btnRelease] = div.querySelectorAll('button');
       btnInfo.onclick = () => {
-        const tempMon = myTeam[0]; myTeam[0] = mon;
-        openPokemonProfile(0);
-        myTeam[0] = tempMon;
+        showPCInfoModal(mon);
       };
       btnTeam.onclick = () => {
         if (myTeam.length >= 6) { showToast('Команда полна (6/6)! Освободите место.', true); return; }
@@ -6814,14 +6850,39 @@ function initTelegram() {
   }
 }
 
+function showLoginScreen(message, isError) {
+  let overlay = document.getElementById('login-overlay');
+  if (!overlay) {
+    overlay = document.createElement('div');
+    overlay.id = 'login-overlay';
+    overlay.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:var(--tma-bg);z-index:999;display:flex;align-items:center;justify-content:center;flex-direction:column;transition:opacity 0.5s;';
+    document.body.appendChild(overlay);
+  }
+  overlay.innerHTML = `
+    <div style="text-align:center;max-width:320px;padding:24px;">
+      <div style="font-size:4rem;margin-bottom:16px;">${isError ? '🔒' : '🐾'}</div>
+      <h2 style="margin:0 0 8px;">League-17 TMA</h2>
+      <p style="color:var(--tma-text-muted);margin:0 0 20px;font-size:0.9rem;">${message}</p>
+      ${isError ? '<p style="color:var(--tma-text-muted);font-size:0.8rem;">Откройте игру через Telegram бота</p>' : '<div class="login-spinner" style="width:32px;height:32px;border:3px solid var(--tma-border);border-top-color:var(--tma-primary);border-radius:50%;margin:0 auto;animation:spin 0.8s linear infinite;"></div>'}
+    </div>
+  `;
+  overlay.style.display = 'flex';
+}
+
+function hideLoginScreen() {
+  const overlay = document.getElementById('login-overlay');
+  if (overlay) {
+    overlay.style.opacity = '0';
+    setTimeout(() => { overlay.style.display = 'none'; }, 500);
+  }
+}
+
 async function authTelegram() {
   initTelegram();
-  let initData = '';
+  showLoginScreen('Авторизация через Telegram...', false);
 
-  if (window.Telegram && window.Telegram.WebApp && window.Telegram.WebApp.initData) {
-    initData = window.Telegram.WebApp.initData;
-  } else {
-    showToast('Игра доступна только через Telegram!', true);
+  if (!window.Telegram || !window.Telegram.WebApp || !window.Telegram.WebApp.initData) {
+    showLoginScreen('Игра доступна только через Telegram', true);
     return;
   }
 
@@ -6829,14 +6890,19 @@ async function authTelegram() {
     const res = await fetch(`${API_BASE}/auth/tg`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ initData })
+      body: JSON.stringify({ initData: window.Telegram.WebApp.initData })
     });
-    if (!res.ok) return;
+    if (!res.ok) {
+      showLoginScreen('Ошибка авторизации. Попробуйте перезапустить бота.', true);
+      return;
+    }
     const data = await res.json();
     tgToken = data.token;
     tgUser = data.user;
+    hideLoginScreen();
   } catch (e) {
     console.warn('Auth failed (offline?)', e);
+    showLoginScreen('Нет соединения с сервером. Проверьте интернет.', true);
   }
 }
 
