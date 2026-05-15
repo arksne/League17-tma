@@ -6168,8 +6168,8 @@ function renderTeamGrid() {
       const types = mon.apiData.types;
       const typeBg = getTypeGradient(types);
       const trainStage = mon.trainingStage || 0;
-      const trainArrow = trainStage > 0
-        ? `<div class="train-arrow" style="color:${trainingStages[trainStage].color};" title="Тренировка: ${trainingStages[trainStage].name} (+${trainingStages[trainStage].pct}%)">▲</div>`
+      const trainLabel = trainStage > 0
+        ? `<div class="train-label" style="background:${trainingStages[trainStage].color};" title="${trainingStages[trainStage].name} (+${trainingStages[trainStage].pct}%)">${trainingStages[trainStage].name}</div>`
         : '';
       slot.innerHTML = `
         ${reorderHtml}
@@ -7014,6 +7014,29 @@ function useItem(itemId) {
       break;
     }
     default: {
+      // Generic equip for battle items + special held items
+      if ((item.category === 'battle' || item.id === 'luckyEgg' || item.id === 'expShare') && getItemQty(item.id) > 0) {
+        if (!mon) { showToast('Сначала выберите покемона во вкладке Команда!', true); break; }
+        if (mon.heldItem === itemId) { showToast('Этот предмет уже надет!', true); break; }
+        if (mon.heldItem) {
+          const heldName = itemDef(mon.heldItem).nameRu;
+          showConfirmModal('Заменить предмет?', `Покемон держит ${heldName}. Заменить на ${item.nameRu}?`, () => {
+            addItem(mon.heldItem);
+            removeItem(itemId);
+            mon.heldItem = itemId;
+            refreshProfileUI();
+            showToast(`${mon.nickname || mon.apiData.name} теперь держит ${item.nameRu}!`, false);
+            autoSave();
+          });
+        } else {
+          removeItem(itemId);
+          mon.heldItem = itemId;
+          refreshProfileUI();
+          showToast(`${mon.nickname || mon.apiData.name} теперь держит ${item.nameRu}!`, false);
+          autoSave();
+        }
+        break;
+      }
       showToast(`${item.nameRu} скоро будет доступно!`, true);
       break;
     }
