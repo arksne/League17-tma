@@ -19,23 +19,24 @@ const allowedOrigin = process.env.ALLOWED_ORIGIN;
 app.use(cors(allowedOrigin ? { origin: allowedOrigin } : {}));
 app.use(express.json({ limit: '10mb' }));
 
-// Request logging
+// Request logging — only for API routes
 app.use((req, res, next) => {
-  res.on('finish', () => {
-    console.log(`${req.method} ${req.path} → ${res.statusCode}`);
-  });
+  if (req.path.startsWith('/api') || req.path.startsWith('/admin')) {
+    res.on('finish', () => {
+      console.log(`${req.method} ${req.path} → ${res.statusCode}`);
+    });
+  }
   next();
 });
 
-// Rate limiting
-const limiter = rateLimit({
-  windowMs: 60 * 1000,
-  max: 100,
-  standardHeaders: true,
-  legacyHeaders: false,
-});
-app.use(limiter);
+// Rate limiting — generous global, strict only on auth
+const globalLimiter = rateLimit({ windowMs: 60*1000, max: 2000, standardHeaders: true, legacyHeaders: false, skip: (req) => req.path.startsWith('/assets') || req.path.startsWith('/avatars') || req.path.includes('socket.io') });
+const authLimiter = rateLimit({ windowMs: 60*1000, max: 30, standardHeaders: true, legacyHeaders: false, message: { error: 'Слишком много запросов. Подожди минуту.' } });
+const apiLimiter = rateLimit({ windowMs: 60*1000, max: 600, standardHeaders: true, legacyHeaders: false, skip: (req) => req.headers.authorization ? true : false });
 
+app.use(globalLimiter);
+app.use('/api/auth', authLimiter);
+app.use('/api/save', apiLimiter);
 app.use('/admin', adminRoutes);
 app.use('/api/auth', authRoutes);
 app.use('/api/save', saveRoutes);
