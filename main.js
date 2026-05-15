@@ -7476,6 +7476,13 @@ async function doCloudSave(attempt = 0) {
     });
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const result = await res.json();
+    // Server has newer data — reload from server immediately
+    if (result.error === 'stale_save') {
+      console.warn('[sync] Server rejected stale save, reloading from server...');
+      const cloudData = await cloudLoad();
+      if (cloudData) applyCloudSave(cloudData);
+      return result;
+    }
     lastCloudSync = Date.now();
     saveRetryCount = 0;
     localStorage.setItem(lsKey('save_sync'), String(lastCloudSync));
