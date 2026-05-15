@@ -47,6 +47,14 @@ router.post('/tg', async (req, res) => {
         'UPDATE users SET username = ?, first_name = ? WHERE id = ?',
         tgUser.username || '', tgUser.first_name || '', user.id
       );
+      // Auto-register existing users who have save data
+      if (!user.registered) {
+        const save = await db.get('SELECT save_data FROM game_saves WHERE user_id = ?', user.id);
+        if (save) {
+          await db.run('UPDATE users SET registered = 1, registered_at = COALESCE(registered_at, datetime(\'now\')) WHERE id = ?', user.id);
+          user.registered = 1;
+        }
+      }
     }
 
     const token = generateToken(user.id, telegramId);
