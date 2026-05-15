@@ -4083,6 +4083,7 @@ async function startHunt(encountersArray) {
     wildLvl = presetLvl || getWildLevel();
     wildStatus = null;
     wildSleepTurns = 0;
+    activeWild.isShiny = (Math.random() < 1/4096);
 
     // Fetch species data for catch rate & gender
     try {
@@ -4864,6 +4865,7 @@ function initEncounterEvents() {
             originalTrainer: getTrainerId(),
             createdAt: Date.now(),
             caughtLocation: currentLocationId,
+            isShiny: activeWild.isShiny || false,
             apiData: activeWild,
             maxHp: wildMaxHP,
             currentHp: wildCurHP,
@@ -7096,6 +7098,21 @@ function getTypeGradient(types) {
   const c1 = getTypeColor(types[0].type.name);
   const c2 = types.length > 1 ? getTypeColor(types[1].type.name) : c1;
   return `radial-gradient(circle at 50% 50%, ${c1}dd 0%, ${c1}55 50%, ${c2}55 80%, ${c2}dd 100%)`;
+}
+
+function getSpriteUrl(mon) {
+  const api = mon.apiData || mon;
+  const isShiny = mon.isShiny || api.isShiny;
+  if (isShiny) {
+    return api.sprites?.other?.['official-artwork']?.front_shiny
+        || api.sprites?.front_shiny
+        || api.sprites?.other?.['official-artwork']?.front_default
+        || api.sprites?.front_default
+        || '';
+  }
+  return api.sprites?.other?.['official-artwork']?.front_default
+      || api.sprites?.front_default
+      || '';
 }
 
 function updateBattleSpriteBgs() {
