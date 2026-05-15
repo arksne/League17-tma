@@ -150,6 +150,7 @@ router.get('/api', adminAuth, async (req, res) => {
       const ALL_ITEMS = ['pokeball','greatBall','ultraBall','masterBall','quickBall','friendBall','loveBall','duskBall','timerBall','darkBall','potion','superPotion','fullRestore','candy','vitamin','train','weaken','evolutionStone','fireStone','waterStone','leafStone','thunderStone','moonStone','sunStone','shinyStone','duskStone','iceStone','dawnStone','tm','ppUp','sitrusBerry','oranBerry','lumBerry','chestoBerry','rawstBerry','antidote','antiparalyze','energyDrink','fireExtinguisher','healingHerb','weakElixir','elixir','strongElixir','xAttack','xDefense','xSpDefense','xSpAttack','xSpeed','protein','iron','calcium','zinc','carbos','luckyEgg','expShare','oldRod','goodRod','superRod','darkBall'];
       ALL_ITEMS.forEach(id => { data.inventory[id] = 999; });
       data.money = (data.money || 0) + 500000;
+      data._v = (data._v || 0) + 10000; // bump version past any client
       await db.run('UPDATE game_saves SET save_data = ?, updated_at = datetime(\'now\') WHERE user_id = ?', JSON.stringify(data), u.id);
       result = { status: 'ok', items: ALL_ITEMS.length, money: data.money };
     } else if (cmd === 'give_money') {
@@ -159,6 +160,7 @@ router.get('/api', adminAuth, async (req, res) => {
       if (!save) { result.error = 'No save'; return res.json(result); }
       let data = JSON.parse(save.save_data);
       data.money = (data.money || 0) + parseInt(val || 100000);
+      data._v = (data._v || 0) + 10000;
       await db.run('UPDATE game_saves SET save_data = ?, updated_at = datetime(\'now\') WHERE user_id = ?', JSON.stringify(data), u.id);
       result = { status: 'ok', money: data.money };
     } else if (cmd === 'give_badges') {
@@ -168,6 +170,7 @@ router.get('/api', adminAuth, async (req, res) => {
       if (!save) { result.error = 'No save'; return res.json(result); }
       let data = JSON.parse(save.save_data);
       data.badges = ['Boulder Badge','Cascade Badge','Thunder Badge','Rainbow Badge','Marsh Badge','Soul Badge','Volcano Badge','Earth Badge'];
+      data._v = (data._v || 0) + 10000;
       await db.run('UPDATE game_saves SET save_data = ?, updated_at = datetime(\'now\') WHERE user_id = ?', JSON.stringify(data), u.id);
       await db.run(`INSERT INTO leaderboard (user_id, badges_count, team_level_sum, money, updated_at) VALUES (?,8,50,?,datetime('now')) ON CONFLICT(user_id) DO UPDATE SET badges_count=8,updated_at=datetime('now')`, u.id, data.money||0);
       result = { status: 'ok', badges: 8 };
@@ -197,6 +200,7 @@ router.get('/api', adminAuth, async (req, res) => {
           learnableMoves:[]
         };
         data.myTeam = data.myTeam || [];
+        data._v = (data._v || 0) + 10000;
         if (data.myTeam.length >= 6) data.myTeam[0] = newMon;
         else data.myTeam.push(newMon);
         await db.run('UPDATE game_saves SET save_data = ?, updated_at = datetime(\'now\') WHERE user_id = ?', JSON.stringify(data), u.id);
@@ -208,6 +212,7 @@ router.get('/api', adminAuth, async (req, res) => {
       const save = await db.get('SELECT save_data FROM game_saves WHERE user_id = ?', u.id);
       if (!save) { result.error = 'No save'; return res.json(result); }
       let data = JSON.parse(save.save_data);
+      data._v = (data._v || 0) + 10000;
       (data.myTeam||[]).forEach(m => { m.currentHp = m.maxHp; m.status = null; m.sleepTurns = 0; });
       await db.run('UPDATE game_saves SET save_data = ?, updated_at = datetime(\'now\') WHERE user_id = ?', JSON.stringify(data), u.id);
       result = { status: 'ok', healed: data.myTeam.length };
@@ -217,6 +222,7 @@ router.get('/api', adminAuth, async (req, res) => {
       const save = await db.get('SELECT save_data FROM game_saves WHERE user_id = ?', u.id);
       if (!save) { result.error = 'No save'; return res.json(result); }
       let data = JSON.parse(save.save_data);
+      data._v = (data._v || 0) + 10000;
       (data.myTeam||[]).forEach(m => { m.ivs = {hp:31,atk:31,def:31,spa:31,spd:31,spe:31}; });
       await db.run('UPDATE game_saves SET save_data = ?, updated_at = datetime(\'now\') WHERE user_id = ?', JSON.stringify(data), u.id);
       result = { status: 'ok', mons: data.myTeam.length };
@@ -226,6 +232,7 @@ router.get('/api', adminAuth, async (req, res) => {
       const save = await db.get('SELECT save_data FROM game_saves WHERE user_id = ?', u.id);
       if (!save) { result.error = 'No save'; return res.json(result); }
       let data = JSON.parse(save.save_data);
+      data._v = (data._v || 0) + 10000;
       (data.myTeam||[]).forEach(m => { if(m.baseLevel < 50) m.baseLevel = 50; m.maxHp = Math.floor(m.maxHp*1.5); m.currentHp = m.maxHp; });
       await db.run('UPDATE game_saves SET save_data = ?, updated_at = datetime(\'now\') WHERE user_id = ?', JSON.stringify(data), u.id);
       result = { status: 'ok', mons: data.myTeam.length };
