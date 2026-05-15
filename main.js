@@ -7977,175 +7977,21 @@ async function sendChatMessage() {
 // ================================================================
 function renderTrainerCard() {
   // Chat sidebar: online players
-  const onlineList = document.getElementById('chat-online-list');
+  const onlineList = document.getElementById("chat-online-list");
   if (onlineList) {
     onlineList.innerHTML = onlinePlayersList.length === 0
-      ? '<span style="color:var(--tma-text-muted)">-</span>'
-      : onlinePlayersList.map(p => `<div style="padding:2px 0;">🟢 ${p.username||'Тренер'}</div>`).join('');
+      ? "<span>-</span>"
+      : onlinePlayersList.map(p => "<div>🟢 "+(p.username||"Тренер")+"</div>").join("");
   }
-  const countEl = document.getElementById('chat-online-count');
-  if (countEl) countEl.innerText = onlinePlayersList.length > 0 ? `(${onlinePlayersList.length})` : '';
-  // Old trainer card elements hidden
-  const nameEl = document.getElementById('trainer-name');
-  const moneyEl = document.getElementById('trainer-money');
-  const badgesEl = document.getElementById('trainer-badges');
-  const caughtEl = document.getElementById('trainer-caught');
-  const teamEl = document.getElementById('trainer-team');
-
-  if (trainerNickname) {
-    nameEl.innerText = trainerNickname;
-  } else if (tgUser) {
-    nameEl.innerText = tgUser.first_name || tgUser.username || `ID:${tgUser.id}`;
-  } else {
-    nameEl.innerText = 'Загрузка...';
-  }
-  nameEl.style.cursor = 'pointer';
-  nameEl.title = 'Нажмите чтобы изменить прозвище';
-  nameEl.onclick = () => {
-    showTextInputModal('Прозвище тренера', trainerNickname || tgUser?.first_name || '', (newName) => {
-      trainerNickname = newName;
-      renderTrainerCard();
-      autoSave();
-    });
-  };
-
-  moneyEl.innerText = `¥${money}`;
-  badgesEl.innerText = badges.length;
-  caughtEl.innerText = `${pokedexCaught.size}/151`;
-
-  if (!myTeam || myTeam.length === 0) {
-    teamEl.innerHTML = '<div class="trainer-team-empty">Нет покемонов</div>';
-    return;
-  }
-
-  teamEl.innerHTML = '';
-  myTeam.forEach(mon => {
-    const div = document.createElement('div');
-    div.className = 'trainer-team-mon';
-    const lvl = mon.baseLevel + (mon.candiesEaten || 0);
-    const spriteUrl = mon.apiData?.sprites?.other?.['official-artwork']?.front_default || mon.apiData?.sprites?.front_default || '';
-    const typeBg = mon.apiData?.types ? getTypeGradient(mon.apiData.types) : '';
-    div.innerHTML = `
-      <div class="trainer-team-mon-img-box" style="background:${typeBg};">
-        <img class="trainer-team-mon-img" src="${spriteUrl}" alt="">
-      </div>
-      <div class="trainer-team-mon-info">
-        <div class="trainer-team-mon-name">${mon.nickname || mon.apiData.name}</div>
-        <div class="trainer-team-mon-lvl">Lv${lvl}</div>
-      </div>`;
-    teamEl.appendChild(div);
-  });
-
-  // Load trainers at location
-  loadLocationTrainers();
+  const countEl = document.getElementById("chat-online-count");
+  if (countEl) countEl.innerText = onlinePlayersList.length > 0 ? "("+onlinePlayersList.length+")" : "";
+  // Old elements - safe null checks
+  const ne=document.getElementById("trainer-name"); if(ne){ne.innerText=trainerNickname||tgUser?.first_name||tgUser?.username||"Тренер";ne.onclick=()=>{showTextInputModal("Прозвище",trainerNickname||tgUser?.first_name||"",(n)=>{trainerNickname=n;renderTrainerCard();autoSave();});};}
+  const me=document.getElementById("trainer-money"); if(me)me.innerText="¥"+money;
+  const be=document.getElementById("trainer-badges"); if(be)be.innerText=badges.length;
+  const ce=document.getElementById("trainer-caught"); if(ce)ce.innerText=pokedexCaught.size+"/151";
+  const te=document.getElementById("trainer-team"); if(te&&myTeam&&myTeam.length>0){te.innerHTML="";myTeam.forEach(m=>{const d=document.createElement("div");d.innerHTML="<span>"+(m.nickname||m.apiData?.name)+" Lv"+(m.baseLevel+(m.candiesEaten||0))+"</span>";te.appendChild(d);});}
 }
-
-// ================================================================
-// TRAINER LOCATION & PROFILES
-// ================================================================
-async function updatePlayerLocation() {
-  const headers = getCloudAuthHeaders();
-  if (!headers.Authorization) return;
-  try {
-    await fetch(`${API_BASE}/profile/location`, {
-      method: 'POST',
-      headers: { ...headers, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ locationId: currentLocationId, region: currentRegion })
-    });
-  } catch (e) {
-    // silent
-  }
-}
-
-async function loadLocationTrainers() {
-  const listEl = document.getElementById('trainer-location-list');
-  if (!listEl) return;
-  try {
-    const res = await fetch(`${API_BASE}/profile/trainers?locationId=${encodeURIComponent(currentLocationId)}`);
-    const data = await res.json();
-    if (!data.trainers || data.trainers.length === 0) {
-      listEl.innerHTML = '<div class="trainer-location-trainer" style="color:#4a6a7a;cursor:default;">Никого нет</div>';
-      return;
-    }
-    listEl.innerHTML = '';
-    data.trainers.forEach(t => {
-      const div = document.createElement('div');
-      div.className = 'trainer-location-trainer';
-      const name = t.first_name || t.username || `Trainer#${t.id}`;
-      div.innerText = name;
-      div.addEventListener('click', () => openTrainerProfile(t.id));
-      listEl.appendChild(div);
-    });
-  } catch (e) {
-    listEl.innerHTML = '<div style="color:#4a6a7a;">Ошибка загрузки</div>';
-  }
-}
-
-function updateTrainerLocationList(data) {
-  const listEl = document.getElementById('trainer-location-list');
-  if (!listEl || !data) return;
-  // Remove empty-state message if present
-  const emptyMsg = listEl.querySelector('.trainer-location-trainer[style]');
-  if (emptyMsg) emptyMsg.remove();
-  // Avoid duplicates
-  const existing = listEl.querySelector(`[data-trainer-id="${data.userId}"]`);
-  if (existing) return;
-  const div = document.createElement('div');
-  div.className = 'trainer-location-trainer';
-  div.setAttribute('data-trainer-id', data.userId);
-  const name = data.firstName || data.username || `Trainer#${data.userId}`;
-  div.innerText = name;
-  div.addEventListener('click', () => openTrainerProfile(data.userId));
-  listEl.appendChild(div);
-}
-
-async function openTrainerProfile(userId) {
-  const modal = document.getElementById('trainer-profile-modal');
-  if (!modal) return;
-  modal.style.display = 'flex';
-
-  document.getElementById('modal-trainer-name').innerText = 'Загрузка...';
-  document.getElementById('modal-trainer-money').innerText = '$0';
-  document.getElementById('modal-trainer-badges').innerText = '0';
-  document.getElementById('modal-trainer-team').innerHTML = '<div class="trainer-team-empty">Загрузка...</div>';
-
-  try {
-    const res = await fetch(`${API_BASE}/profile/${userId}`);
-    const data = await res.json();
-    if (!data.profile) {
-      document.getElementById('modal-trainer-name').innerText = 'Тренер не найден';
-      return;
-    }
-
-    const p = data.profile;
-    document.getElementById('modal-trainer-name').innerText = p.first_name || p.username || `Trainer#${p.id}`;
-    document.getElementById('modal-trainer-money').innerText = `¥${p.money}`;
-    document.getElementById('modal-trainer-badges').innerText = p.badges;
-
-    const teamEl = document.getElementById('modal-trainer-team');
-    teamEl.innerHTML = '';
-    if (!p.team || p.team.length === 0) {
-      teamEl.innerHTML = '<div class="trainer-team-empty">Нет покемонов</div>';
-      return;
-    }
-    p.team.forEach(mon => {
-      const div = document.createElement('div');
-      div.className = 'trainer-team-mon';
-      div.innerHTML = `
-        <div class="trainer-team-mon-img-box">
-          <img class="trainer-team-mon-img" src="${mon.sprite || ''}" alt="">
-        </div>
-        <div class="trainer-team-mon-info">
-          <div class="trainer-team-mon-name">${mon.nickname || mon.name}</div>
-          <div class="trainer-team-mon-lvl">Lv${mon.level}</div>
-        </div>`;
-      teamEl.appendChild(div);
-    });
-  } catch (e) {
-    document.getElementById('modal-trainer-name').innerText = 'Ошибка загрузки';
-  }
-}
-
 // --- P2P TRADING VIA SOCKET.IO ---
 let socket = null;
 let onlinePlayersList = [];
