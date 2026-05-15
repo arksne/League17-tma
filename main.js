@@ -3172,14 +3172,19 @@ function saveGame() {
 
   const saveJson = JSON.stringify(saveData);
   try {
+    // Rotate backups: keep last 2 previous saves
+    const prev1 = localStorage.getItem(lsKey('save'));
+    if (prev1) {
+      try { localStorage.setItem(lsKey('save_bak2'), localStorage.getItem(lsKey('save_bak1')) || ''); } catch(_) {}
+      try { localStorage.setItem(lsKey('save_bak1'), prev1); } catch(_) {}
+    }
     localStorage.setItem(lsKey('save'), saveJson);
     localStorage.setItem(lsKey('save_ts'), String(Date.now()));
     localStorage.setItem(lsKey('save_v'), String(saveVersion));
   } catch (e) {
     console.warn('localStorage save failed — freeing space', e);
     try {
-      // Remove auxiliary keys to free space, keep 'save' intact
-      ['save_backup', 'save_ts', 'save_v', 'quest_date', 'pokedex_seen', 'pokedex_caught', 'battle_state'].forEach(k => {
+      ['save_backup', 'save_bak1', 'save_bak2', 'save_ts', 'save_v', 'quest_date', 'pokedex_seen', 'pokedex_caught', 'battle_state'].forEach(k => {
         try { localStorage.removeItem(lsKey(k)); } catch(_) {}
       });
       localStorage.setItem(lsKey('save'), saveJson);
@@ -3265,8 +3270,23 @@ function loadGame() {
     return true;
   } catch (e) {
     console.warn('Load failed — data corrupted', e);
-    // Keep backup of corrupted data for debugging
     try { localStorage.setItem(lsKey('save_corrupted'), raw || ''); } catch (_) {}
+    // Try backup recovery
+    for (const bak of ['save_bak1', 'save_bak2']) {
+      try {
+        const bakRaw = localStorage.getItem(lsKey(bak));
+        if (!bakRaw) continue;
+        const bakData = JSON.parse(bakRaw);
+        if (bakData.myTeam) {
+          console.warn(`Recovered from ${bak}!`);
+          showToast('Данные восстановлены из резервной копии!', false);
+          // Re-run load with backup data
+          localStorage.setItem(lsKey('save'), bakRaw);
+          localStorage.setItem(lsKey('save_v'), String(bakData._v || 0));
+          return loadGame(); // Retry with recovered data
+        }
+      } catch(_) {}
+    }
     return false;
   }
 }
@@ -3424,7 +3444,8 @@ function initAppNav() {
     'view-backpack': 'Рюкзак',
     'view-team': 'Команда Покемонов',
     'view-chat': 'Чат',
-    'view-trainers': 'Тренеры'
+    'view-trainers': 'Тренеры',
+    'view-info': 'Инфо'
   };
 
   navItems.forEach(item => {
@@ -4012,6 +4033,31 @@ function getAbilityName(pokemon, isWild) {
 function statStageModify(pokemon, stat, delta) {
   if (!pokemon.statStages) pokemon.statStages = { atk: 0, def: 0, spa: 0, spd: 0, spe: 0 };
   pokemon.statStages[stat] = Math.max(-6, Math.min(6, (pokemon.statStages[stat] || 0) + delta));
+  updateStatBadges();
+}
+
+function updateStatBadges() {
+  const labels = { atk: 'Атк', def: 'Защ', spa: 'САт', spd: 'СЗа', spe: 'Скр' };
+  // Player badges
+  const playerEl = document.getElementById('player-stat-badges');
+  if (playerEl && activePlayerMon?.statStages) {
+    playerEl.innerHTML = Object.entries(activePlayerMon.statStages)
+      .filter(([_, v]) => v !== 0)
+      .map(([k, v]) => {
+        const sign = v > 0 ? '+' : '';
+        return `<span class="stat-badge ${v > 0 ? 'positive' : 'negative'}">${labels[k] || k} ${sign}${v}</span>`;
+      }).join('');
+  }
+  // Wild badges
+  const wildEl = document.getElementById('wild-stat-badges');
+  if (wildEl && activeWild?.statStages) {
+    wildEl.innerHTML = Object.entries(activeWild.statStages || {})
+      .filter(([_, v]) => v !== 0)
+      .map(([k, v]) => {
+        const sign = v > 0 ? '+' : '';
+        return `<span class="stat-badge ${v > 0 ? 'positive' : 'negative'}">${labels[k] || k} ${sign}${v}</span>`;
+      }).join('');
+  }
 }
 
 // --- BERRIES (Feature 3) ---
@@ -4638,6 +4684,7 @@ async function startHunt(encountersArray) {
     wildLvl = presetLvl || getWildLevel();
     wildStatus = null;
     wildSleepTurns = 0;
+    activeWild.statStages = { atk: 0, def: 0, spa: 0, spd: 0, spe: 0 };
     activeWild.isShiny = (Math.random() < 1/4096);
 
     // Fetch species data for catch rate & gender
@@ -5665,6 +5712,9 @@ function initEncounterEvents() {
       m.statStages = { atk: 0, def: 0, spa: 0, spd: 0, spe: 0 };
       m.choiceLockedMove = undefined;
     });
+    // Clear stat badges
+    document.getElementById('player-stat-badges').innerHTML = '';
+    document.getElementById('wild-stat-badges').innerHTML = '';
   });
 }
 

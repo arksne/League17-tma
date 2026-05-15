@@ -374,6 +374,10 @@
           <div class="nav-icon"><div class="pokeball-icon trainers"></div></div>
           <span>Тренеры</span>
         </div>
+        <div class="nav-item" data-target="view-info">
+          <div class="nav-icon"><span style="font-size:1.4rem;">📖</span></div>
+          <span>Инфо</span>
+        </div>
       </nav>
 
     </div>
@@ -405,6 +409,7 @@
             <div class="reborn-sprite-box">
               <img class="reborn-sprite" id="player-sprite" src="" alt="player">
             </div>
+            <div class="stat-badges" id="player-stat-badges"></div>
           </div>
 
           <!-- WILD POKEMON -->
@@ -424,6 +429,7 @@
             <div class="reborn-sprite-box">
               <img class="reborn-sprite" id="wild-sprite" src="" alt="wild">
             </div>
+            <div class="stat-badges" id="wild-stat-badges"></div>
           </div>
 
         </div><!-- /reborn-pokemon-row -->
@@ -652,6 +658,80 @@
         <h2>🔔 Уведомления</h2>
         <div id="notif-list" style="display:flex;flex-direction:column;gap:6px;max-height:60vh;overflow-y:auto;"></div>
         <button class="tma-btn" id="btn-close-notif" style="margin-top:12px;width:100%;">Закрыть</button>
+      </div>
+    </div>
+
+    <!-- INFO VIEW -->
+    <div id="view-info" class="app-view">
+      <div style="padding:10px;overflow-y:auto;max-height:calc(100vh - 120px);font-size:0.82rem;line-height:1.6;">
+        <h2 style="color:var(--tma-primary);margin-bottom:12px;">📖 Пособие Тренера</h2>
+
+        <details open><summary style="font-weight:700;color:var(--tma-accent);cursor:pointer;margin:8px 0;">⚔ Битвы</summary>
+          <p>• Дикие покемоны встречаются при поиске (🔴 кнопка Hunt) или рыбалке (🎣).</p>
+          <p>• У каждого покемона 4 атаки. Используй их стратегически — учитывай типы!</p>
+          <p>• <b>Суперэффективно</b> (x2): огонь против травы, вода против огня, электричество против воды и т.д.</p>
+          <p>• <b>Малоэффективно</b> (x0.5): нормальная против камня, огонь против воды и т.д.</p>
+          <p>• При бегстве шанс зависит от скорости. Каждая попытка увеличивает шанс.</p>
+          <p>• После победы: 10% шанс на Сладкую Конфету (+1 ур.), деньги и дроп монстров.</p>
+        </details>
+
+        <details><summary style="font-weight:700;color:var(--tma-accent);cursor:pointer;margin:8px 0;">🎒 Предметы</summary>
+          <p>• <b>Аптечка</b> — +20 HP. <b>Супер Аптечка</b> — +60 HP. <b>Восстановление</b> — полное лечение.</p>
+          <p>• <b>Сладкая Конфета</b> — +1 уровень (редкий дроп 10%).</p>
+          <p>• <b>Витамин</b> — +10 EV к выбранному стату (макс 10 шт).</p>
+          <p>• <b>Тренировка</b> — улучшает стат на 5-15% (стадии: Базовая, Средняя, Тяжёлая, Элитная).</p>
+          <p>• <b>Эволюционный Камень</b> — эволюция (если доступна). Стихийные камни для конкретных типов.</p>
+          <p>• <b>TM (Переучивание)</b> — замена атаки покемона на изученную.</p>
+          <p>• <b>Ягоды</b>: Ситрус (+25% HP при &lt;50%), Оран (+10 HP), Лам (лечит статус), Често (лечит сон), Рост (лечит ожог).</p>
+          <p>• <b>Удочки</b>: Старая, Хорошая, Супер — разные водные покемоны на локациях с водой.</p>
+        </details>
+
+        <details><summary style="font-weight:700;color:var(--tma-accent);cursor:pointer;margin:8px 0;">⭐ Звёзды покемонов</summary>
+          <p>• <b style="color:#ff9500;">★ Звёзды мощи (1-10)</b> — основаны на сумме базовых статов (BST).</p>
+          <p style="font-size:0.72rem;color:#aaa;">1★: &lt;250 BST | 3★: 300-349 | 5★: 400-449 | 7★: 500-549 | 9★: 600-649 | 10★: 650+</p>
+          <p>• <b>✦ Чёрные звёзды редкости (1-5)</b> — шанс встретить/поймать.</p>
+          <p style="font-size:0.72rem;color:#aaa;">1✦: Обычный | 2✦: Необычный | 3✦: Редкий | 4✦: Очень редкий | 5✦: Легендарный</p>
+        </details>
+
+        <details><summary style="font-weight:700;color:var(--tma-accent);cursor:pointer;margin:8px 0;">🥚 Разведение (PC Боксы)</summary>
+          <p>• Помести двух покемонов в один PC-бокс в Покецентре.</p>
+          <p>• <b>Условия</b>: разный пол (male+female), общая яичная группа.</p>
+          <p>• <b>Бонус</b>: одинаковый характер — яйцо появится в 2 раза быстрее (5 мин вместо 10).</p>
+          <p>• Яйцо появляется в том же боксе. Забери его в команду.</p>
+          <p>• <b>Вылупление</b>: 7 дней. Покемон 1 уровня, наследует 2 случайных IV от родителей.</p>
+          <p>• Ditto может скрещиваться с любым покемоном.</p>
+        </details>
+
+        <details><summary style="font-weight:700;color:var(--tma-accent);cursor:pointer;margin:8px 0;">🎣 Рыбалка</summary>
+          <p>• На локациях с водой (🌊) появляется кнопка "Рыбачить".</p>
+          <p>• <b>Старая удочка</b>: Magikarp, Goldeen, Poliwag, Tentacool, Krabby.</p>
+          <p>• <b>Хорошая удочка</b>: Psyduck, Slowpoke, Shellder, Staryu, Horsea и др.</p>
+          <p>• <b>Супер удочка</b>: Gyarados, Seaking, Lapras, Dratini, Cloyster и др.</p>
+        </details>
+
+        <details><summary style="font-weight:700;color:var(--tma-accent);cursor:pointer;margin:8px 0;">💡 Характеры и Статы</summary>
+          <p>• 25 характеров. Каждый повышает один стат на 10% и понижает другой на 10%.</p>
+          <p>• <b>IV</b> (0-31): генетика, не меняется. Влияет на максимум стата.</p>
+          <p>• <b>EV</b> (0-252): тренировка. +1 к стату за каждые 4 EV на уровне 100.</p>
+          <p>• <b>Стат-стадии</b> в бою: от -6 до +6. Каждый шаг = +50%/-33%. Сбрасываются после боя.</p>
+        </details>
+
+        <details><summary style="font-weight:700;color:var(--tma-accent);cursor:pointer;margin:8px 0;">🤝 Обмен и PvP</summary>
+          <p>• <b>Обмен</b>: в Покецентре → Обменник. Выбери игрока онлайн, предложи покемона.</p>
+          <p>• <b>PvP бой</b>: через профиль тренера (кнопка ⚔). Требуется живой покемон.</p>
+          <p>• Чат доступен всем игрокам на сервере. Команды для админов: /claude, !статус, !дай предметы и др.</p>
+        </details>
+
+        <details><summary style="font-weight:700;color:var(--tma-accent);cursor:pointer;margin:8px 0;">🛡 Сохранение</summary>
+          <p>• <b>Автосохранение</b> после каждого важного действия.</p>
+          <p>• <b>Облако</b>: все данные хранятся на сервере. При смене устройства прогресс восстанавливается.</p>
+          <p>• <b>Локально</b>: резервная копия в браузере. 3 бэкапа с ротацией.</p>
+          <p>• Если облачные данные новее локальных — они применяются автоматически.</p>
+        </details>
+
+        <p style="text-align:center;color:var(--tma-text-muted);margin-top:20px;font-size:0.7rem;">
+          League-17 TMA v1.0 · Сделано с ❤️ · Покемоны принадлежат Nintendo/GameFreak
+        </p>
       </div>
     </div>
 

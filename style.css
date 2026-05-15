@@ -1045,6 +1045,25 @@ input[type="number"] {
   filter: drop-shadow(0 0 2px rgba(255,255,255,0.3));
 }
 
+/* Stat stage badges in battle */
+.stat-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px;
+  justify-content: center;
+  margin-top: 4px;
+  min-height: 18px;
+  font-size: 0.55rem;
+}
+.stat-badge {
+  padding: 1px 4px;
+  border-radius: 3px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+.stat-badge.positive { background: rgba(52,199,89,0.3); color: #34c759; }
+.stat-badge.negative { background: rgba(255,59,48,0.3); color: #ff3b30; }
+
 /* --- GYM INFO IN BATTLE --- */
 .reborn-gym-info {
   text-align: center;
