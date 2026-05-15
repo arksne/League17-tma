@@ -1939,6 +1939,14 @@ let myTeam = [];
 // PC STORAGE (boxes of 30)
 let pcBoxes = [[]];
 
+// BREEDING SYSTEM
+let breedingPairs = []; // [{ boxIdx, mon1Uid, mon2Uid, startTime, readyTime }]
+let eggs = [];          // [{ uid, species, apiData, readyTime, boxIdx, parent1Uid, parent2Uid }]
+const EGG_TIME = 10 * 60 * 1000;      // 10 min to produce egg
+const EGG_BONUS_TIME = 5 * 60 * 1000;  // 5 min with matching nature
+const EGG_HATCH_TIME = 15 * 60 * 1000; // 15 min to hatch
+const BREEDING_CHECK_INTERVAL = 60 * 1000; // check every minute
+
 // ACTIVE POKEMON STATE
 let currentPokemonIndex = null;
 
@@ -2268,6 +2276,9 @@ document.addEventListener('DOMContentLoaded', async () => {
   updateTimeOfDay();
   setInterval(updateTimeOfDay, 30000);
 
+  // Periodic breeding & egg hatch check
+  setInterval(() => { if (eggs.length > 0 || breedingPairs.length > 0) checkBreeding(); }, BREEDING_CHECK_INTERVAL);
+
   // Pokedex events
   const btnOpenPokedex = document.getElementById('btn-open-pokedex');
   if (btnOpenPokedex) btnOpenPokedex.addEventListener('click', openPokedex);
@@ -2531,6 +2542,201 @@ function collectDaycareMons() {
   autoSave();
 }
 
+// --- BREEDING SYSTEM ---
+const eggGroupCache = new Map(); // speciesName → egg_groups[]
+
+async function getMonEggGroups(mon) {
+  const name = mon.apiData?.species?.name || mon.apiData?.name;
+  if (!name) return [];
+  if (eggGroupCache.has(name)) return eggGroupCache.get(name);
+  try {
+    const speciesUrl = mon.apiData?.species?.url || `https://pokeapi.co/api/v2/pokemon-species/${name}`;
+    const res = await fetch(speciesUrl);
+    const data = await res.json();
+    const groups = (data.egg_groups || []).map(g => g.name);
+    eggGroupCache.set(name, groups);
+    return groups;
+  } catch(e) { return []; }
+}
+
+function getMonGender(mon) {
+  return mon.gender || mon.apiData?.wildGender || null;
+}
+
+function areBreedingCompatible(mon1, mon2, groups1, groups2) {
+  if (mon1.uid === mon2.uid) return false;
+  const g1 = getMonGender(mon1);
+  const g2 = getMonGender(mon2);
+  if (!g1 || !g2) return false;
+  if (g1 === g2) return false;
+  // Check shared egg group
+  const shared = groups1.filter(g => groups2.includes(g));
+  if (shared.length === 0 && !groups1.includes('ditto') && !groups2.includes('ditto')) return false;
+  return true;
+}
+
+async function checkBreeding() {
+  const now = Date.now();
+
+  // Check each box for breeding pairs
+  for (let boxIdx = 0; boxIdx < pcBoxes.length; boxIdx++) {
+    const box = pcBoxes[boxIdx];
+    if (box.length < 2) continue;
+
+    // Find existing pair for this box
+    const existingPair = breedingPairs.find(p => p.boxIdx === boxIdx);
+
+    // Check if existing pair is ready → create egg
+    if (existingPair && now >= existingPair.readyTime) {
+      const m1 = box.find(m => m.uid === existingPair.mon1Uid);
+      const m2 = box.find(m => m.uid === existingPair.mon2Uid);
+      if (m1 && m2) {
+        const eggUid = generateUID();
+        const species = m1.apiData?.species?.name || m1.apiData?.name;
+        const egg = {
+          uid: eggUid,
+          species,
+          readyTime: now + EGG_HATCH_TIME,
+          boxIdx,
+          parent1Uid: existingPair.mon1Uid,
+          parent2Uid: existingPair.mon2Uid
+        };
+        eggs.push(egg);
+        appendToLog(`🥚 В Боксе ${boxIdx + 1} появилось яйцо! (${species})`, false, 'quest');
+      }
+      // Remove pair — they produce one egg, need to be re-paired
+      breedingPairs = breedingPairs.filter(p => p !== existingPair);
+    }
+
+    // Find new pairs if no existing pair for this box
+    if (!breedingPairs.some(p => p.boxIdx === boxIdx)) {
+      for (let i = 0; i < box.length; i++) {
+        for (let j = i + 1; j < box.length; j++) {
+          const m1 = box[i], m2 = box[j];
+          if (!m1.apiData || !m2.apiData) continue;
+          const groups1 = await getMonEggGroups(m1);
+          const groups2 = await getMonEggGroups(m2);
+          if (areBreedingCompatible(m1, m2, groups1, groups2)) {
+            const sameNature = m1.natureIdx === m2.natureIdx;
+            const readyTime = now + (sameNature ? EGG_BONUS_TIME : EGG_TIME);
+            breedingPairs.push({
+              boxIdx,
+              mon1Uid: m1.uid,
+              mon2Uid: m2.uid,
+              startTime: now,
+              readyTime
+            });
+            const natureBonus = sameNature ? ' (быстро — одинаковый характер!)' : '';
+            appendToLog(`💕 ${m1.apiData.name} и ${m2.apiData.name} в Боксе ${boxIdx + 1} нашли друг друга!${natureBonus}`, false, 'quest');
+            break; // One pair per box at a time
+          }
+        }
+        if (breedingPairs.some(p => p.boxIdx === boxIdx)) break;
+      }
+    }
+  }
+
+  // Check egg hatching (eggs in team)
+  for (const egg of eggs) {
+    if (egg.inTeam && now >= egg.readyTime) {
+      await hatchEgg(egg);
+    }
+  }
+
+  // Clean up eggs from deleted boxes
+  eggs = eggs.filter(e => e.boxIdx !== undefined ? pcBoxes[e.boxIdx] !== undefined : true);
+
+  saveGame();
+}
+
+async function hatchEgg(egg) {
+  try {
+    const res = await fetch(`https://pokeapi.co/api/v2/pokemon/${egg.species}`);
+    const pokeData = await res.json();
+    const newMon = {
+      uid: generateUID(),
+      originalTrainer: getTrainerId(),
+      createdAt: Date.now(),
+      caughtLocation: 'breeding',
+      apiData: pokeData,
+      maxHp: 50, currentHp: 50,
+      ivs: { hp: Math.floor(Math.random()*32), atk: Math.floor(Math.random()*32), def: Math.floor(Math.random()*32), spa: Math.floor(Math.random()*32), spd: Math.floor(Math.random()*32), spe: Math.floor(Math.random()*32) },
+      evs: { hp: 0, atk: 0, def: 0, spa: 0, spd: 0, spe: 0 },
+      baseLevel: 1, exp: 0, expToNext: 8,
+      candiesEaten: 0, vitaminsEaten: 0,
+      training: null, trainingStage: 0, trainingStat: null,
+      happiness: 120,
+      natureIdx: Math.floor(Math.random() * natures.length),
+      breedLetter: ['A','B','C','D'][Math.floor(Math.random()*4)],
+      gender: Math.random() < 0.5 ? 'male' : 'female',
+      status: null, sleepTurns: 0,
+      movesPP: [],
+      statStages: { atk: 0, def: 0, spa: 0, spd: 0, spe: 0 },
+      abilityName: pokeData.abilities[0]?.ability?.name || null,
+      heldItem: null,
+      berries: { sitrusBerry: 0, oranBerry: 0, lumBerry: 0, chestoBerry: 0, rawstBerry: 0 },
+      learnableMoves: [],
+      isEgg: false
+    };
+    // Inherit one random IV from each parent
+    if (egg.parent1Uid && egg.parent2Uid) {
+      const allMons = [...myTeam, ...pcBoxes.flat()];
+      const p1 = allMons.find(m => m.uid === egg.parent1Uid);
+      const p2 = allMons.find(m => m.uid === egg.parent2Uid);
+      if (p1) {
+        const stats = ['hp','atk','def','spa','spd','spe'];
+        const s1 = stats[Math.floor(Math.random()*stats.length)];
+        const s2 = stats[Math.floor(Math.random()*stats.length)];
+        if (p1.ivs) newMon.ivs[s1] = p1.ivs[s1];
+        if (p2?.ivs) newMon.ivs[s2] = p2.ivs[s2];
+      }
+    }
+
+    if (myTeam.length < 6) {
+      myTeam.push(newMon);
+      appendToLog(`🎉 Из яйца вылупился ${pokeData.name}!`, false, 'quest');
+    } else {
+      if (pcBoxes.length === 0) pcBoxes.push([]);
+      pcBoxes[0].push(newMon);
+      appendToLog(`🎉 Из яйца вылупился ${pokeData.name}! (отправлен в PC)`, false, 'quest');
+    }
+    eggs = eggs.filter(e => e !== egg);
+    renderTeamGrid();
+    saveGame();
+  } catch(e) {
+    console.error('Hatch failed:', e);
+  }
+}
+
+function collectEgg(eggUid) {
+  const egg = eggs.find(e => e.uid === eggUid);
+  if (!egg || egg.inTeam) return;
+  if (myTeam.length >= 6) { showToast('Команда полна! Освободите место.', true); return; }
+  // Move egg to team
+  const eggMon = {
+    uid: egg.uid,
+    apiData: { name: 'яйцо', sprites: { front_default: '' }, types: [], stats: [], moves: [], abilities: [] },
+    maxHp: 10, currentHp: 10,
+    ivs: { hp: 0, atk: 0, def: 0, spa: 0, spd: 0, spe: 0 },
+    evs: { hp: 0, atk: 0, def: 0, spa: 0, spd: 0, spe: 0 },
+    baseLevel: 0, exp: 0, expToNext: 0,
+    candiesEaten: 0, vitaminsEaten: 0,
+    training: null, trainingStage: 0, trainingStat: null,
+    happiness: 0, natureIdx: 0, breedLetter: 'A',
+    gender: null, status: null, sleepTurns: 0,
+    movesPP: [], statStages: { atk: 0, def: 0, spa: 0, spd: 0, spe: 0 },
+    abilityName: null, heldItem: null,
+    berries: { sitrusBerry: 0, oranBerry: 0, lumBerry: 0, chestoBerry: 0, rawstBerry: 0 },
+    learnableMoves: [], isEgg: true
+  };
+  myTeam.push(eggMon);
+  egg.inTeam = true;
+  eggs = eggs.map(e => e.uid === eggUid ? { ...e, inTeam: true } : e);
+  renderTeamGrid();
+  saveGame();
+  showToast('Яйцо добавлено в команду!', false);
+}
+
 // --- PC STORAGE ---
 function showPCInfoModal(mon) {
   const curLvl = mon.baseLevel + (mon.candiesEaten || 0);
@@ -2598,6 +2804,7 @@ function openPC() {
 
   renderPCSlots('team');
   modal.style.display = 'flex';
+  checkBreeding(); // Check for breeding pairs when PC opens
 
   document.getElementById('btn-pc-close').onclick = () => {
     modal.style.display = 'none';
@@ -2811,7 +3018,7 @@ function getFullSaveData() {
       exp: m.exp, expToNext: m.expToNext, candiesEaten: m.candiesEaten,
       vitaminsEaten: m.vitaminsEaten, training: m.training, trainingStage: m.trainingStage,
       trainingStat: m.trainingStat, happiness: m.happiness, natureIdx: m.natureIdx,
-      breedLetter: m.breedLetter, status: m.status, sleepTurns: m.sleepTurns,
+      breedLetter: m.breedLetter, gender: m.gender, status: m.status, sleepTurns: m.sleepTurns,
       movesPP: m.movesPP, statStages: m.statStages, abilityName: m.abilityName,
       heldItem: m.heldItem, berries: m.berries, learnableMoves: m.learnableMoves,
       _learnableFetched: m._learnableFetched,
@@ -2827,12 +3034,14 @@ function getFullSaveData() {
       currentHp: m.currentHp, ivs: m.ivs, evs: m.evs, baseLevel: m.baseLevel,
       exp: m.exp, expToNext: m.expToNext, candiesEaten: m.candiesEaten,
       vitaminsEaten: m.vitaminsEaten, trainingStage: m.trainingStage, trainingStat: m.trainingStat,
-      happiness: m.happiness, natureIdx: m.natureIdx, breedLetter: m.breedLetter,
+      happiness: m.happiness, natureIdx: m.natureIdx, breedLetter: m.breedLetter, gender: m.gender,
       status: m.status, sleepTurns: m.sleepTurns, movesPP: m.movesPP,
       statStages: m.statStages, abilityName: m.abilityName, heldItem: m.heldItem,
       berries: m.berries, learnableMoves: m.learnableMoves,
     }))),
     daycareMons, daycareEgg, lastLocation, expShareActive,
+    breedingPairs: breedingPairs.map(p => ({ boxIdx: p.boxIdx, mon1Uid: p.mon1Uid, mon2Uid: p.mon2Uid, startTime: p.startTime, readyTime: p.readyTime })),
+    eggs: eggs.map(e => ({ uid: e.uid, species: e.species, readyTime: e.readyTime, boxIdx: e.boxIdx, parent1Uid: e.parent1Uid, parent2Uid: e.parent2Uid, inTeam: e.inTeam })),
   };
 }
 
@@ -2958,6 +3167,8 @@ function loadGame() {
     daycareEgg = data.daycareEgg || null;
     lastLocation = data.lastLocation || null;
     expShareActive = data.expShareActive || false;
+    breedingPairs = data.breedingPairs || [];
+    eggs = data.eggs || [];
 
     validateGameState();
     return true;
@@ -3079,6 +3290,7 @@ async function giveStarterMon(pokemonName) {
       happiness: 70,
       natureIdx: 0,
       breedLetter: 'A',
+      gender: Math.random() < 0.5 ? 'male' : 'female',
       status: null,
       sleepTurns: 0,
       movesPP: [],
@@ -4560,8 +4772,11 @@ async function useMove(moveIndex) {
         const statKey = statNameMap[sc.stat.name];
         if (statKey) {
           statStageModify(affectedMon, statKey, sc.change);
-          const dir = sc.change > 0 ? 'повысилась' : 'понизилась';
-          appendToLog(`У ${monName} ${dir} ${sc.stat.name}!`, false, 'system');
+          const newStage = affectedMon.statStages[statKey];
+          const sign = newStage >= 0 ? '+' : '';
+          const dir = sc.change > 0 ? 'повышена' : 'понижена';
+          const labels = { atk: 'Атака', def: 'Защита', spa: 'Сп. Атака', spd: 'Сп. Защита', spe: 'Скорость' };
+          appendToLog(`${labels[statKey] || statKey} ${monName} ${dir} (${sign}${newStage})`, false, 'system');
           appliedStat = true;
         }
       });
@@ -4725,7 +4940,7 @@ async function useMove(moveIndex) {
   if (wildCurHP === 0) {
     appendToLog(`Дикий ${activeWild.name} побежден!`);
     checkQuestProgress('defeat_x');
-    addItem('candy');
+    if (Math.random() < 0.10) { addItem('candy'); appendToLog('Вы нашли Сладкую Конфету!', false, 'quest'); }
     const dropResults = processMonsterDrop(activeWild.name);
     if (dropResults.length > 0) {
       const dropText = dropResults.map(d => `${d.qty}x ${itemDef(d.item).nameRu}`).join(', ');
@@ -4841,7 +5056,7 @@ function enemyTurn() {
   applyStatusEndOfTurn(activeWild, false);
   if (wildCurHP <= 0) {
     appendToLog(`Дикий ${activeWild.name} побежден!`);
-    addItem('candy');
+    if (Math.random() < 0.10) { addItem('candy'); appendToLog('Вы нашли Сладкую Конфету!', false, 'quest'); }
     const dropResults = processMonsterDrop(activeWild.name);
     if (dropResults.length > 0) {
       const dropText = dropResults.map(d => `${d.qty}x ${itemDef(d.item).nameRu}`).join(', ');
@@ -5083,6 +5298,7 @@ function initEncounterEvents() {
             createdAt: Date.now(),
             caughtLocation: currentLocationId,
             isShiny: activeWild.isShiny || false,
+            gender: activeWild.wildGender || null,
             apiData: activeWild,
             maxHp: wildMaxHP,
             currentHp: wildCurHP,
@@ -5327,6 +5543,11 @@ function initEncounterEvents() {
     battleRound = 0;
     wildMovesPP = null;
     if (activePlayerMon) activePlayerMon.choiceLockedMove = undefined;
+    // Clear all team stat stages and volatile status after battle
+    myTeam.forEach(m => {
+      m.statStages = { atk: 0, def: 0, spa: 0, spd: 0, spe: 0 };
+      m.choiceLockedMove = undefined;
+    });
   });
 }
 
@@ -6312,15 +6533,27 @@ function renderTeamGrid() {
       const trainLabel = trainStage > 0
         ? `<div class="train-label" style="background:${trainingStages[trainStage].color};" title="${trainingStages[trainStage].name} (+${trainingStages[trainStage].pct}%)">${trainingStages[trainStage].name}</div>`
         : '';
-      slot.innerHTML = `
-        ${reorderHtml}
-        <div class="team-sprite-wrap">
-          <img src="${mon.apiData.sprites?.other?.['official-artwork']?.front_default || mon.apiData.sprites.front_default}" alt="sprite" style="background:${typeBg};">
-          ${trainLabel}
-        </div>
-        <div class="slot-name">${mon.nickname || mon.apiData.name} ${statusIcon}</div>
-        <div class="slot-lvl">Lvl ${curLvl} | ${mon.currentHp}/${mon.maxHp} HP</div>
-      `;
+      if (mon.isEgg) {
+        const eggData = eggs.find(e => e.uid === mon.uid);
+        const remaining = eggData ? Math.max(0, Math.ceil((eggData.readyTime - Date.now()) / 60000)) : '?';
+        slot.innerHTML = `
+          <div class="team-sprite-wrap">
+            <span style="font-size:48px;">🥚</span>
+          </div>
+          <div class="slot-name">Яйцо</div>
+          <div class="slot-lvl">Вылупится через ~${remaining} мин</div>
+        `;
+      } else {
+        slot.innerHTML = `
+          ${reorderHtml}
+          <div class="team-sprite-wrap">
+            <img src="${mon.apiData.sprites?.other?.['official-artwork']?.front_default || mon.apiData.sprites.front_default}" alt="sprite" style="background:${typeBg};">
+            ${trainLabel}
+          </div>
+          <div class="slot-name">${mon.nickname || mon.apiData.name} ${statusIcon}</div>
+          <div class="slot-lvl">Lvl ${curLvl} | ${mon.currentHp}/${mon.maxHp} HP</div>
+        `;
+      }
       slot.setAttribute('data-poke-index', i);
       slot.addEventListener('click', (e) => {
         if (e.target.closest('.team-move-btn')) return;
@@ -7651,6 +7884,8 @@ function applyCloudSave(data) {
   daycareEgg = data.daycareEgg || daycareEgg;
   lastLocation = data.lastLocation || lastLocation;
   expShareActive = data.expShareActive || expShareActive;
+  breedingPairs = data.breedingPairs || breedingPairs;
+  eggs = data.eggs || eggs;
   quests = data.quests || quests;
   questProgress = data.questProgress || questProgress;
   completedQuests = data.completedQuests || completedQuests;
