@@ -2608,3 +2608,81 @@ input[type="number"] {
   margin: 10px 0 4px 0;
   text-align: left;
 }
+
+/* --- Reusable Modals (confirm, selection, text input, item info) --- */
+.confirm-modal-card {
+  background: var(--tma-card-bg);
+  border-radius: var(--radius);
+  padding: 24px;
+  max-width: 360px;
+  width: 90%;
+  text-align: center;
+}
+.confirm-modal-card h3 { margin: 0 0 8px 0; font-size: 1.1rem; }
+.confirm-modal-card p { color: var(--tma-text-muted); margin: 0 0 20px 0; font-size: 0.9rem; line-height: 1.4; }
+
+.confirm-modal-buttons { display: flex; gap: 10px; }
+.confirm-btn {
+  flex: 1;
+  border: none;
+  border-radius: 8px;
+  padding: 10px 16px;
+  font-weight: 600;
+  font-size: 0.95rem;
+  cursor: pointer;
+  transition: opacity 0.2s;
+}
+.confirm-btn:hover { opacity: 0.85; }
+.confirm-btn-yes { background: #34c759; color: white; }
+.confirm-btn-no { background: var(--tma-text-muted); color: white; }
+
+.selection-modal-card {
+  background: var(--tma-card-bg);
+  border-radius: var(--radius);
+  padding: 20px;
+  max-width: 380px;
+  width: 90%;
+  max-height: 70vh;
+  overflow-y: auto;
+}
+.selection-modal-card h3 { margin: 0 0 12px 0; font-size: 1.1rem; text-align: center; }
+
+.selection-item-btn {
+  display: block;
+  width: 100%;
+  padding: 10px 12px;
+  margin: 4px 0;
+  border: 1px solid var(--tma-border);
+  border-radius: 8px;
+  background: transparent;
+  color: var(--tma-text);
+  text-align: left;
+  cursor: pointer;
+  font-size: 0.95rem;
+  transition: background 0.15s;
+}
+.selection-item-btn:hover { background: rgba(91,160,232,0.15); }
+.selection-item-btn .item-subtitle { display: block; font-size: 0.8rem; color: var(--tma-text-muted); }
+
+.text-input-modal {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid var(--tma-border);
+  border-radius: 8px;
+  background: var(--tma-bg);
+  color: var(--tma-text);
+  font-size: 1rem;
+  box-sizing: border-box;
+}
+.text-input-modal:focus { outline: none; border-color: var(--tma-primary); }
+
+.item-info-card {
+  background: var(--tma-card-bg);
+  border-radius: var(--radius);
+  padding: 24px;
+  max-width: 340px;
+  width: 90%;
+}
+.item-info-card h3 { margin: 0 0 8px 0; font-size: 1.1rem; }
+.item-info-card p { margin: 8px 0; line-height: 1.4; font-size: 0.9rem; color: var(--tma-text-muted); }
+.item-info-details { font-size: 0.9rem; margin-top: 8px; white-space: pre-line; }

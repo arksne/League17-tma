@@ -602,7 +602,7 @@ const TRANSPORT_HUBS = {
 
 function travelToRegion(targetRegion, targetLoc, ticketItemId) {
   if (!hasItem(ticketItemId)) {
-    alert(`Нужен билет: ${itemDef(ticketItemId).nameRu}!`);
+    showToast(`Нужен билет: ${itemDef(ticketItemId).nameRu}!`, true);
     return;
   }
   
@@ -620,7 +620,7 @@ function travelToRegion(targetRegion, targetLoc, ticketItemId) {
   }
 
   if (!schedule.includes(currentHour)) {
-    alert(`Транспорт сейчас недоступен! Расписание отправлений: ${schedule.map(h => h + ':00').join(', ')}. Текущее время сервера: ${currentHour}:00`);
+    showToast(`Транспорт сейчас недоступен! Расписание отправлений: ${schedule.map(h => h + ':00').join(', ')}. Текущее время сервера: ${currentHour}:00`, true);
     return;
   }
 
@@ -1788,11 +1788,11 @@ document.addEventListener('DOMContentLoaded', async () => {
       } else {
         const enc = getLocationEncounters();
         if (enc.length === 0) {
-          alert('На этой локации не водятся дикие покемоны.');
+          showToast('На этой локации не водятся дикие покемоны.', true);
           return;
         }
         if (!myTeam.some(m => m.currentHp > 0)) {
-          alert('Вам нужен хотя бы один живой покемон!');
+          showToast('Вам нужен хотя бы один живой покемон!', true);
           return;
         }
         startAutoHunt();
@@ -1871,37 +1871,38 @@ let daycareEgg = null; // { species, readyTime }
 
 function openDaycareDeposit() {
   const available = myTeam.map((m, i) => ({ m, i })).filter(({ m }) => m.currentHp > 0);
-  if (available.length < 2) { alert('Нужно минимум 2 живых покемона!'); return; }
+  if (available.length < 2) { showToast('Нужно минимум 2 живых покемона!', true); return; }
 
-  const msg = available.map(({ m }, i) =>
-    `${i + 1}. Lv.${m.baseLevel + m.candiesEaten} ${m.nickname || m.apiData?.name} (${m.apiData?.gender || '?'})`
-  ).join('\n');
+  const items = available.map(({ m }) => ({
+    label: `Lv.${m.baseLevel + m.candiesEaten} ${m.nickname || m.apiData?.name}`,
+    subtitle: `${m.apiData?.gender || '?'} | HP: ${m.currentHp}/${m.maxHp}`
+  }));
 
-  const c1 = prompt('Питомник — выберите ПЕРВОГО покемона (номер):\n' + msg);
-  if (!c1) return;
-  const i1 = parseInt(c1) - 1;
-  if (isNaN(i1) || i1 < 0 || i1 >= available.length) return alert('Неверный выбор!');
+  showSelectionModal('Питомник — выберите ПЕРВОГО покемона', items, (i1) => {
+    // Remove the selected pokemon and show second picker
+    const remaining = available.filter((_, i) => i !== i1);
+    const items2 = remaining.map(({ m }) => ({
+      label: `Lv.${m.baseLevel + m.candiesEaten} ${m.nickname || m.apiData?.name}`,
+      subtitle: `${m.apiData?.gender || '?'} | HP: ${m.currentHp}/${m.maxHp}`
+    }));
 
-  const c2 = prompt('Выберите ВТОРОГО покемона (номер):\n' + msg);
-  if (!c2) return;
-  const i2 = parseInt(c2) - 1;
-  if (isNaN(i2) || i2 < 0 || i2 >= available.length) return alert('Неверный выбор!');
-  if (i1 === i2) return alert('Нельзя выбрать одного покемона дважды!');
+    showSelectionModal('Выберите ВТОРОГО покемона', items2, (i2) => {
+      const mon1 = available[i1].m;
+      const mon2 = remaining[i2].m;
+      const idx1 = myTeam.indexOf(mon1);
+      const idx2 = myTeam.indexOf(mon2);
+      const higherIdx = Math.max(idx1, idx2);
+      const lowerIdx = Math.min(idx1, idx2);
 
-  const mon1 = available[i1].m;
-  const mon2 = available[i2].m;
-  const idx1 = myTeam.indexOf(mon1);
-  const idx2 = myTeam.indexOf(mon2);
-  const higherIdx = Math.max(idx1, idx2);
-  const lowerIdx = Math.min(idx1, idx2);
+      daycareMons.push({ mon: myTeam.splice(higherIdx, 1)[0], depositTime: Date.now() });
+      daycareMons.push({ mon: myTeam.splice(lowerIdx, 1)[0], depositTime: Date.now() });
 
-  daycareMons.push({ mon: myTeam.splice(higherIdx, 1)[0], depositTime: Date.now() });
-  daycareMons.push({ mon: myTeam.splice(lowerIdx, 1)[0], depositTime: Date.now() });
-
-  appendToLog(`${mon1.nickname || mon1.apiData?.name} и ${mon2.nickname || mon2.apiData?.name} оставлены в Питомнике!`, false, 'quest');
-  alert('Покемоны оставлены в Питомнике!\nОни будут набирать опыт пока вы путешествуете.\nПроверяйте Питомник время от времени!');
-  renderTeamGrid();
-  autoSave();
+      appendToLog(`${mon1.nickname || mon1.apiData?.name} и ${mon2.nickname || mon2.apiData?.name} оставлены в Питомнике!`, false, 'quest');
+      showToast('Покемоны оставлены в Питомнике!', false);
+      renderTeamGrid();
+      autoSave();
+    });
+  });
 }
 
 function checkDaycare() {
@@ -1942,21 +1943,21 @@ function checkDaycare() {
 }
 
 function collectDaycareEgg() {
-  if (!daycareEgg) return alert('Яйца пока нет!');
+  if (!daycareEgg) return showToast('Яйца пока нет!', true);
   if (Date.now() < daycareEgg.readyTime) {
     const minsLeft = Math.ceil((daycareEgg.readyTime - Date.now()) / 60000);
-    return alert(`Яйцо ещё не готово! Осталось ~${minsLeft} мин.`);
+    return showToast(`Яйцо ещё не готово! Осталось ~${minsLeft} мин.`, true);
   }
   // Give egg as item
   daycareEgg = null;
   addItem('suspiciousEgg');
-  alert('Вы получили яйцо! Оно добавлено в инвентарь.');
+  showToast('Вы получили яйцо! Оно добавлено в инвентарь.', true);
   autoSave();
 }
 
 function collectDaycareMons() {
-  if (daycareMons.length === 0) return alert('В Питомнике нет покемонов!');
-  if (myTeam.length >= 6) return alert('Команда полна! Освободите место.');
+  if (daycareMons.length === 0) return showToast('В Питомнике нет покемонов!', true);
+  if (myTeam.length >= 6) return showToast('Команда полна! Освободите место.', true);
   checkDaycare();
   const entry = daycareMons.shift();
   myTeam.push(entry.mon);
@@ -2024,7 +2025,7 @@ function renderPCSlots(view) {
         <button class="btn-use" style="background:#5856d6;padding:4px 10px;">В PC</button>
       `;
       div.querySelector('button').onclick = () => {
-        if (myTeam.length <= 1) { alert('Нельзя оставить команду пустой!'); return; }
+        if (myTeam.length <= 1) { showToast('Нельзя оставить команду пустой!', true); return; }
         const targetBox = pcBoxes.length > 0 ? 0 : (pcBoxes.push([]), 0);
         pcBoxes[targetBox].push(myTeam.splice(i, 1)[0]);
         if (activePlayerMon && activePlayerMon === mon && myTeam.length > 0) {
@@ -2055,16 +2056,17 @@ function renderPCSlots(view) {
       `;
       const [btnTeam, btnRelease] = div.querySelectorAll('button');
       btnTeam.onclick = () => {
-        if (myTeam.length >= 6) { alert('Команда полна (6/6)! Освободите место.'); return; }
+        if (myTeam.length >= 6) { showToast('Команда полна (6/6)! Освободите место.', true); return; }
         myTeam.push(box.splice(i, 1)[0]);
         if (box.length === 0) { pcBoxes.splice(boxIdx, 1); }
         openPC();
       };
       btnRelease.onclick = () => {
-        if (!confirm(`Отпустить ${mon.name || mon.apiData?.name}? Это нельзя отменить.`)) return;
-        box.splice(i, 1);
-        if (box.length === 0) { pcBoxes.splice(boxIdx, 1); }
-        openPC();
+        showConfirmModal('Отпустить покемона?', `${mon.name || mon.apiData?.name} будет отпущен навсегда. Это нельзя отменить.`, () => {
+          box.splice(i, 1);
+          if (box.length === 0) { pcBoxes.splice(boxIdx, 1); }
+          openPC();
+        });
       };
       container.appendChild(div);
     });
@@ -2167,7 +2169,7 @@ function craftItem(recipeId) {
   if (!recipe) return;
 
   const canCraft = Object.entries(recipe.ingredients).every(([id, qty]) => getItemQty(id) >= qty);
-  if (!canCraft) return alert('Недостаточно ингредиентов!');
+  if (!canCraft) return showToast('Недостаточно ингредиентов!', true);
 
   Object.entries(recipe.ingredients).forEach(([id, qty]) => {
     for (let i = 0; i < qty; i++) removeItem(id);
@@ -2176,7 +2178,7 @@ function craftItem(recipeId) {
   for (let i = 0; i < recipe.qty; i++) addItem(recipe.result);
 
   const resultItem = ITEMS.find(i => i.id === recipe.result);
-  alert(`Создано: ${resultItem?.nameRu || recipe.result} x${recipe.qty}!`);
+  showToast(`Создано: ${resultItem?.nameRu || recipe.result} x${recipe.qty}!`, false);
   updateInventoryDisplay();
   openCrafting();
 }
@@ -2266,9 +2268,10 @@ function autoSave() {
 }
 
 function resetGame() {
-  if (!confirm('Сбросить весь прогресс? Это действие необратимо!')) return;
-  localStorage.removeItem('league17_save');
-  location.reload();
+  showConfirmModal('Сброс прогресса', 'Это действие необратимо! Вы уверены?', () => {
+    localStorage.removeItem('league17_save');
+    location.reload();
+  });
 }
 
 // --- STARTER ---
@@ -2320,7 +2323,7 @@ async function giveStarter() {
       const chosenStarter = gen[Math.floor(Math.random() * gen.length)];
       modal.style.display = 'none';
       giveStarterMon(chosenStarter);
-      alert(`Вам выпал покемон: ${chosenStarter.toUpperCase()}! (Gen ${idx + 1})`);
+      showToast(`Вам выпал покемон: ${chosenStarter.toUpperCase()}! (Gen ${idx + 1})`, false);
     });
     grid.appendChild(div);
   });
@@ -2508,7 +2511,7 @@ function openNPCDialog(npcId) {
         mon.statStages = { atk: 0, def: 0, spa: 0, spd: 0, spe: 0 };
         if (mon.movesPP) mon.movesPP.forEach(pp => { if (pp) pp.current = pp.max; });
       });
-      alert('Ваша команда полностью вылечена!');
+      showToast('Ваша команда полностью вылечена!', true);
       modal.style.display = 'none';
       autoSave();
     };
@@ -2531,7 +2534,7 @@ function openNPCDialog(npcId) {
     btnDaycare.style.backgroundColor = '#ff9500';
     btnDaycare.innerText = '🥚 Оставить в Питомнике';
     btnDaycare.onclick = () => {
-      if (myTeam.length < 2) { alert('Нужно минимум 2 покемона в команде!'); return; }
+      if (myTeam.length < 2) { showToast('Нужно минимум 2 покемона в команде!', true); return; }
       openDaycareDeposit();
       modal.style.display = 'none';
     };
@@ -2690,7 +2693,7 @@ function renderLocation(locId) {
     btnHeal.style.backgroundColor = '#34c759';
     btnHeal.innerText = '🏥 Вылечить команду';
     btnHeal.onclick = () => {
-      if (myTeam.length === 0) { alert('У вас нет покемонов!'); return; }
+      if (myTeam.length === 0) { showToast('У вас нет покемонов!', true); return; }
       let healed = false;
       myTeam.forEach(mon => {
         if (!mon || !mon.apiData) return;
@@ -3042,7 +3045,7 @@ function checkBerryAutoUse(mon, isPlayer) {
 }
 
 function giveBerryToMon(berryType) {
-  alert('Пожалуйста, используйте экипировку (Держит) в профиле покемона для выдачи ягод и предметов!');
+  showToast('Пожалуйста, используйте экипировку (Держит) в профиле покемона для выдачи ягод и предметов!', true);
 }
 
 // --- QUESTS (Feature 5) ---
@@ -3082,7 +3085,7 @@ function checkQuestProgress(type, amount, itemId) {
 
 function claimQuestReward(questId) {
   const q = quests.find(x => x.id === questId);
-  if (!q || !q.completed || q.claimed) return alert('Задание уже выполнено или недоступно!');
+  if (!q || !q.completed || q.claimed) return showToast('Задание уже выполнено или недоступно!', true);
   q.claimed = true;
   money += q.rewardMoney;
   if (q.rewardItem) {
@@ -3092,7 +3095,7 @@ function claimQuestReward(questId) {
   updateMoneyDisplay();
   updateInventoryDisplay();
   autoSave();
-  alert(`Награда получена: ¥${q.rewardMoney}${q.rewardItem ? ` + ${q.rewardQty}x ${q.rewardItem}` : ''}!`);
+  showToast(`Награда получена: ¥${q.rewardMoney}${q.rewardItem ? ` + ${q.rewardQty}x ${q.rewardItem}` : ''}!`, true);
   renderQuests();
 }
 
@@ -3253,49 +3256,47 @@ function applyStatusEndOfTurn(target, isPlayer) {
 // --- SWITCH POKEMON ---
 function switchPokemon() {
   const aliveMons = myTeam.filter((mon, i) => mon.currentHp > 0 && mon !== activePlayerMon);
-  if (aliveMons.length === 0) { alert('Нет других покемонов для смены!'); return; }
+  if (aliveMons.length === 0) { showToast('Нет других покемонов для смены!', true); return; }
 
-  // Simple overlay picker
-  const choice = prompt(
-    'Выберите покемона (введите номер):\n' +
-    aliveMons.map((m, i) => `${i + 1}. Lv.${m.baseLevel + m.candiesEaten} ${m.name || m.apiData?.name} HP:${m.currentHp}/${m.maxHp}`).join('\n')
-  );
-  if (!choice) return;
-  const idx = parseInt(choice) - 1;
-  if (isNaN(idx) || idx < 0 || idx >= aliveMons.length) { alert('Неверный выбор!'); return; }
+  const items = aliveMons.map((m) => ({
+    label: `Lv.${m.baseLevel + m.candiesEaten} ${m.name || m.apiData?.name}`,
+    subtitle: `HP: ${m.currentHp}/${m.maxHp}`
+  }));
 
-  const newActive = aliveMons[idx];
-  const oldActive = activePlayerMon;
+  showSelectionModal('Выберите покемона', items, (idx) => {
+    const newActive = aliveMons[idx];
+    const oldActive = activePlayerMon;
 
-  // Swap positions: put new active first
-  const oldIdx = myTeam.indexOf(oldActive);
-  const newIdx = myTeam.indexOf(newActive);
-  myTeam[oldIdx] = newActive;
-  myTeam[newIdx] = oldActive;
-  activePlayerMon = newActive;
+    // Swap positions: put new active first
+    const oldIdx = myTeam.indexOf(oldActive);
+    const newIdx = myTeam.indexOf(newActive);
+    myTeam[oldIdx] = newActive;
+    myTeam[newIdx] = oldActive;
+    activePlayerMon = newActive;
 
-  // Clear choice lock
-  delete activePlayerMon.choiceLockedMove;
+    // Clear choice lock
+    delete activePlayerMon.choiceLockedMove;
 
-  appendToLog(`${oldActive.name || oldActive.apiData?.name}, возвращайся! Вперёд, ${newActive.name || newActive.apiData?.name}!`, false, 'switch');
+    appendToLog(`${oldActive.name || oldActive.apiData?.name}, возвращайся! Вперёд, ${newActive.name || newActive.apiData?.name}!`, false, 'switch');
 
-  // Rebuild player moves
-  playerMovesDetailed = activePlayerMon.apiData?.moves?.filter(m => {
-    const vgd = m.version_group_details;
-    return vgd && vgd.length && activePlayerMon.movesPP?.some(pp => pp?.moveName === m.move.name);
-  }) || [];
+    // Rebuild player moves
+    playerMovesDetailed = activePlayerMon.apiData?.moves?.filter(m => {
+      const vgd = m.version_group_details;
+      return vgd && vgd.length && activePlayerMon.movesPP?.some(pp => pp?.moveName === m.move.name);
+    }) || [];
 
-  // Update UI
-  document.getElementById('player-name').innerText = activePlayerMon.nickname || activePlayerMon.apiData.name;
-  document.getElementById('player-lvl').innerText = `Lv${activePlayerMon.baseLevel + activePlayerMon.candiesEaten}`;
-  const playerSpriteUrl = activePlayerMon.apiData.sprites?.other?.['official-artwork']?.front_default || activePlayerMon.apiData.sprites.front_default;
-  document.getElementById('player-sprite').src = playerSpriteUrl;
-  document.getElementById('player-status-icon').innerText = getStatusIcon(activePlayerMon.status);
-  updatePlayerHpUI();
+    // Update UI
+    document.getElementById('player-name').innerText = activePlayerMon.nickname || activePlayerMon.apiData.name;
+    document.getElementById('player-lvl').innerText = `Lv${activePlayerMon.baseLevel + activePlayerMon.candiesEaten}`;
+    const playerSpriteUrl = activePlayerMon.apiData.sprites?.other?.['official-artwork']?.front_default || activePlayerMon.apiData.sprites.front_default;
+    document.getElementById('player-sprite').src = playerSpriteUrl;
+    document.getElementById('player-status-icon').innerText = getStatusIcon(activePlayerMon.status);
+    updatePlayerHpUI();
 
-  // Enemy gets a turn after switch
-  document.getElementById('battle-main-menu').style.display = 'none';
-  setTimeout(() => { enemyTurn(); }, 1500);
+    // Enemy gets a turn after switch
+    document.getElementById('battle-main-menu').style.display = 'none';
+    setTimeout(() => { enemyTurn(); }, 1500);
+  }, true);
 }
 
 // --- BATTLE SYSTEM ---
@@ -3398,10 +3399,6 @@ function startAutoHunt() {
       huntTimer = setTimeout(doTick, 2000);
       return;
     }
-    if (document.getElementById('gym-battle-modal')?.style.display === 'flex') {
-      huntTimer = setTimeout(doTick, 2000);
-      return;
-    }
     if (document.getElementById('elite-modal')?.style.display === 'flex') {
       huntTimer = setTimeout(doTick, 2000);
       return;
@@ -3475,11 +3472,11 @@ function getLocationHasWater() {
 }
 
 function startFishing(rodType) {
-  if (!getLocationHasWater()) return alert('Здесь негде рыбачить!');
-  if (!myTeam.some(m => m.currentHp > 0)) return alert('Вам нужен хотя бы один живой покемон!');
+  if (!getLocationHasWater()) return showToast('Здесь негде рыбачить!', true);
+  if (!myTeam.some(m => m.currentHp > 0)) return showToast('Вам нужен хотя бы один живой покемон!', true);
 
   const table = FISHING_TABLES[rodType];
-  if (!table) return alert('Неизвестная удочка!');
+  if (!table) return showToast('Неизвестная удочка!', true);
 
   if (rodType === 'superRod') {
     removeItem('superRod');
@@ -3514,7 +3511,7 @@ async function startHunt(encountersArray) {
   battleRound = 0;
   const activeMonIndex = myTeam.findIndex(m => m.currentHp > 0);
   if (activeMonIndex === -1) {
-    return alert('Вам нужен хотя бы один живой покемон для битвы!');
+    return showToast('Вам нужен хотя бы один живой покемон для битвы!', true);
   }
 
   battleType = 'wild';
@@ -4252,7 +4249,7 @@ function initEncounterEvents() {
 
   document.getElementById('btn-switch').addEventListener('click', () => {
     if (battleType === 'gym' || battleType === 'elite' || battleType === 'champion') {
-      alert('Нельзя сменить покемона в бою с лидером!');
+      showToast('Нельзя сменить покемона в бою с лидером!', true);
       return;
     }
     switchPokemon();
@@ -4275,11 +4272,8 @@ function initEncounterEvents() {
       if (battleType !== 'wild') {
         return appendToLog('Нельзя ловить в бою с лидером!');
       }
-      if (ballCfg.qty <= 0) return alert(`У вас нет ${ballCfg.label}ов!`);
-      if (myTeam.length >= 6) {
-        if (!confirm('Команда полна! Отправить пойманного покемона в PC?')) return;
-        // Continue — will auto-send to box below
-      }
+      if (ballCfg.qty <= 0) return showToast(`У вас нет ${ballCfg.label}ов!`, true);
+      // If team is full, will auto-send to PC box below
 
       ballCfg.dec();
       updateInventoryDisplay();
@@ -4386,8 +4380,8 @@ function initEncounterEvents() {
       }, 1000);
 
     } else if (item === 'potion') {
-      if (getItemQty('potion') <= 0) return alert('У вас нет Аптечек!');
-      if (activePlayerMon.currentHp >= activePlayerMon.maxHp) return alert('Здоровье уже полное!');
+      if (getItemQty('potion') <= 0) return showToast('У вас нет Аптечек!', true);
+      if (activePlayerMon.currentHp >= activePlayerMon.maxHp) return showToast('Здоровье уже полное!', true);
 
       itemsUsedInBattle++;
       checkQuestProgress('use_item');
@@ -4409,8 +4403,8 @@ function initEncounterEvents() {
         }
       }, 1500);
     } else if (item === 'superPotion') {
-      if (getItemQty('superPotion') <= 0) return alert('Нет Супер Аптечек!');
-      if (activePlayerMon.currentHp >= activePlayerMon.maxHp) return alert('Здоровье уже полное!');
+      if (getItemQty('superPotion') <= 0) return showToast('Нет Супер Аптечек!', true);
+      if (activePlayerMon.currentHp >= activePlayerMon.maxHp) return showToast('Здоровье уже полное!', true);
       itemsUsedInBattle++;
       checkQuestProgress('use_item');
       removeItem('superPotion');
@@ -4424,8 +4418,8 @@ function initEncounterEvents() {
         if (battleType === 'wild') { enemyTurn(); } else { enemyTurnGym(); }
       }, 1500);
     } else if (item === 'fullRestore') {
-      if (getItemQty('fullRestore') <= 0) return alert('Нет Полного Восстановления!');
-      if (activePlayerMon.currentHp >= activePlayerMon.maxHp && !activePlayerMon.status) return alert('Здоровье уже полное!');
+      if (getItemQty('fullRestore') <= 0) return showToast('Нет Полного Восстановления!', true);
+      if (activePlayerMon.currentHp >= activePlayerMon.maxHp && !activePlayerMon.status) return showToast('Здоровье уже полное!', true);
       itemsUsedInBattle++;
       checkQuestProgress('use_item');
       removeItem('fullRestore');
@@ -4440,10 +4434,10 @@ function initEncounterEvents() {
         if (battleType === 'wild') { enemyTurn(); } else { enemyTurnGym(); }
       }, 1500);
     } else if (item === 'evolutionStone') {
-      if (getItemQty('evolutionStone') <= 0) return alert('Нет Камней Эволюции!');
+      if (getItemQty('evolutionStone') <= 0) return showToast('Нет Камней Эволюции!', true);
       (async () => {
         const evoTarget = await checkEvolution(activePlayerMon, true);
-        if (!evoTarget) return alert('Этот покемон не может эволюционировать!');
+        if (!evoTarget) return showToast('Этот покемон не может эволюционировать!', true);
         itemsUsedInBattle++;
         checkQuestProgress('use_item');
         removeItem('evolutionStone');
@@ -4457,27 +4451,27 @@ function initEncounterEvents() {
         }, 1500);
       })();
     } else if (item === 'tm') {
-      if (getItemQty('tm') <= 0) return alert('Нет TM-совместимости!');
-      alert('Используйте TM из профиля покемона.');
+      if (getItemQty('tm') <= 0) return showToast('Нет TM-совместимости!', true);
+      showToast('Используйте TM из профиля покемона.', true);
     } else if (itemCategory(item) === 'statusCure') {
       const statusCureMap = {
         'antidote': 'psn', 'antiparalyze': 'par', 'energyDrink': 'slp',
         'fireExtinguisher': 'brn', 'antiSputin': null,
       };
       const targetStatus = statusCureMap[item];
-      if (getItemQty(item) <= 0) return alert(`Нет ${itemDef(item).nameRu}!`);
+      if (getItemQty(item) <= 0) return showToast(`Нет ${itemDef(item).nameRu}!`, true);
       if (item === 'healingHerb') {
-        if (!activePlayerMon.status) return alert('У покемона нет статуса!');
+        if (!activePlayerMon.status) return showToast('У покемона нет статуса!', true);
         removeItem(item);
         cureStatus(activePlayerMon);
         document.getElementById('player-status-icon').innerText = '';
       } else if (targetStatus) {
-        if (activePlayerMon.status !== targetStatus) return alert('Этот предмет не лечит текущий статус!');
+        if (activePlayerMon.status !== targetStatus) return showToast('Этот предмет не лечит текущий статус!', true);
         removeItem(item);
         cureStatus(activePlayerMon);
         document.getElementById('player-status-icon').innerText = '';
       } else {
-        return alert('Этот предмет пока не работает в бою.');
+        return showToast('Этот предмет пока не работает в бою.', true);
       }
       itemsUsedInBattle++;
       checkQuestProgress('use_item');
@@ -4490,9 +4484,9 @@ function initEncounterEvents() {
     } else if (['weakElixir', 'elixir', 'strongElixir'].includes(item)) {
       const elixirMap = { 'weakElixir': 10, 'elixir': 20, 'strongElixir': 40 };
       const ppRestore = elixirMap[item];
-      if (getItemQty(item) <= 0) return alert(`Нет ${itemDef(item).nameRu}!`);
+      if (getItemQty(item) <= 0) return showToast(`Нет ${itemDef(item).nameRu}!`, true);
       if (!activePlayerMon.movesPP || activePlayerMon.movesPP.every(pp => pp && pp.current >= pp.max)) {
-        return alert('PP уже полностью!');
+        return showToast('PP уже полностью!', true);
       }
       removeItem(item);
       itemsUsedInBattle++;
@@ -4515,10 +4509,10 @@ function initEncounterEvents() {
     } else if (['xAttack', 'xDefense', 'xSpDefense', 'xSpAttack', 'xSpeed', 'xAccuracy'].includes(item)) {
       const xMap = { 'xAttack': 'atk', 'xDefense': 'def', 'xSpDefense': 'spd', 'xSpAttack': 'spa', 'xSpeed': 'spe', 'xAccuracy': null };
       const stat = xMap[item];
-      if (getItemQty(item) <= 0) return alert(`Нет ${itemDef(item).nameRu}!`);
+      if (getItemQty(item) <= 0) return showToast(`Нет ${itemDef(item).nameRu}!`, true);
       if (stat) {
         if (!activePlayerMon.statStages) activePlayerMon.statStages = { atk: 0, def: 0, spa: 0, spd: 0, spe: 0 };
-        if (activePlayerMon.statStages[stat] >= 6) return alert('Стат уже максимально повышен!');
+        if (activePlayerMon.statStages[stat] >= 6) return showToast('Стат уже максимально повышен!', true);
         removeItem(item);
         itemsUsedInBattle++;
         checkQuestProgress('use_item');
@@ -4530,13 +4524,13 @@ function initEncounterEvents() {
           if (battleType === 'wild') { enemyTurn(); } else { enemyTurnGym(); }
         }, 1500);
       } else {
-        return alert('Этот предмет пока не работает в бою.');
+        return showToast('Этот предмет пока не работает в бою.', true);
       }
     } else if (itemCategory(item) === 'evolutionStones' && item !== 'evolutionStone') {
-      if (getItemQty(item) <= 0) return alert(`Нет ${itemDef(item).nameRu}!`);
+      if (getItemQty(item) <= 0) return showToast(`Нет ${itemDef(item).nameRu}!`, true);
       (async () => {
         const evoTarget = await checkEvolution(activePlayerMon, true, item);
-        if (!evoTarget) return alert('Этот покемон не может эволюционировать с этим камнем!');
+        if (!evoTarget) return showToast('Этот покемон не может эволюционировать с этим камнем!', true);
         itemsUsedInBattle++;
         checkQuestProgress('use_item');
         removeItem(item);
@@ -4607,7 +4601,7 @@ async function startGymBattle(locId) {
   const leader = gymLeaders[locId];
   const activeMonIndex = myTeam.findIndex(m => m.currentHp > 0);
   if (activeMonIndex === -1) {
-    return alert('Вам нужен хотя бы один живой покемон для битвы!');
+    return showToast('Вам нужен хотя бы один живой покемон для битвы!', true);
   }
 
   battleType = 'gym';
@@ -5147,7 +5141,7 @@ async function startEliteBattle() {
   gymTeamIndex = 0;
 
   const activeMonIndex = myTeam.findIndex(m => m.currentHp > 0);
-  if (activeMonIndex === -1) return alert('Вам нужен хотя бы один живой покемон!');
+  if (activeMonIndex === -1) return showToast('Вам нужен хотя бы один живой покемон!', true);
   activePlayerMon = myTeam[activeMonIndex];
   activePlayerMon.choiceLockedMove = undefined;
 
@@ -5556,13 +5550,13 @@ function initShopEvents() {
     const itemId = btn.getAttribute('data-item');
     const price = shopPrices[itemId];
 
-    if (money < price) return alert('Недостаточно кредитов!');
+    if (money < price) return showToast('Недостаточно кредитов!', true);
 
     money -= price;
 
     if (!addItem(itemId)) {
       money += price;
-      return alert('Ошибка при покупке!');
+      return showToast('Ошибка при покупке!', true);
     }
 
     document.getElementById('shop-money-display').innerText = money;
@@ -5570,7 +5564,7 @@ function initShopEvents() {
     updateMoneyDisplay();
     autoSave();
 
-    alert(`Куплено! Осталось кредитов: ¥${money}`);
+    showToast(`Куплено! Осталось кредитов: ¥${money}`, false);
   });
 }
 
@@ -6060,7 +6054,7 @@ function renderInventory() {
       const qty = getItemQty(itemId);
       const priceInfo = item.price > 0 ? `\n💰 Цена: ${item.price.toLocaleString()} кр.` : '';
       const sellInfo = item.sellPrice > 0 ? `\n🏷️ Продажа: ${item.sellPrice.toLocaleString()} кр.` : '';
-      alert(`📦 ${item.nameRu}\n\n📝 ${item.desc}\n📊 Кол-во: ${qty}${priceInfo}${sellInfo}`);
+      showItemInfoModal(item, qty);
     });
   });
 
@@ -6076,44 +6070,44 @@ function renderInventory() {
 
 function useItem(itemId) {
   const item = ITEMS.find(i => i.id === itemId);
-  if (!item) return alert('Предмет не найден!');
-  if (getItemQty(itemId) <= 0) return alert(`Нет ${item.nameRu}!`);
-  if (!item.isUsable) return alert(`${item.nameRu} нельзя использовать из рюкзака.`);
-  if (currentPokemonIndex === null) return alert('Сначала выберите покемона во вкладке "Команда"!');
+  if (!item) return showToast('Предмет не найден!', true);
+  if (getItemQty(itemId) <= 0) return showToast(`Нет ${item.nameRu}!`, true);
+  if (!item.isUsable) return showToast(`${item.nameRu} нельзя использовать из рюкзака.`, true);
+  if (currentPokemonIndex === null) return showToast('Сначала выберите покемона во вкладке "Команда"!', true);
 
   const mon = myTeam[currentPokemonIndex];
-  if (!mon) return alert('Покемон не найден!');
+  if (!mon) return showToast('Покемон не найден!', true);
 
   switch (itemId) {
     case 'potion': {
-      if (mon.currentHp >= mon.maxHp) return alert('Здоровье уже полное!');
+      if (mon.currentHp >= mon.maxHp) return showToast('Здоровье уже полное!', true);
       removeItem('potion');
       mon.currentHp += 20;
       if (mon.currentHp > mon.maxHp) mon.currentHp = mon.maxHp;
       refreshProfileUI();
-      alert(`Вы использовали Аптечку. Здоровье ${mon.apiData.name} восстановлено!`);
+      showToast(`Вы использовали Аптечку. Здоровье ${mon.apiData.name} восстановлено!`, false);
       break;
     }
     case 'superPotion': {
-      if (mon.currentHp >= mon.maxHp) return alert('Здоровье уже полное!');
+      if (mon.currentHp >= mon.maxHp) return showToast('Здоровье уже полное!', true);
       removeItem('superPotion');
       mon.currentHp += 50;
       if (mon.currentHp > mon.maxHp) mon.currentHp = mon.maxHp;
       refreshProfileUI();
-      alert(`Супер Аптечка использована! Здоровье ${mon.nickname || mon.apiData.name} восстановлено.`);
+      showToast(`Супер Аптечка использована! Здоровье ${mon.nickname || mon.apiData.name} восстановлено.`, false);
       break;
     }
     case 'fullRestore': {
-      if (mon.currentHp >= mon.maxHp && !mon.status) return alert('Здоровье уже полное!');
+      if (mon.currentHp >= mon.maxHp && !mon.status) return showToast('Здоровье уже полное!', true);
       removeItem('fullRestore');
       mon.currentHp = mon.maxHp;
       cureStatus(mon);
       refreshProfileUI();
-      alert(`Полное Восстановление использовано! ${mon.nickname || mon.apiData.name} полностью здоров!`);
+      showToast(`Полное Восстановление использовано! ${mon.nickname || mon.apiData.name} полностью здоров!`, false);
       break;
     }
     case 'candy': {
-      if (mon.baseLevel + mon.candiesEaten >= 100) return alert('Достигнут максимальный 100 уровень!');
+      if (mon.baseLevel + mon.candiesEaten >= 100) return showToast('Достигнут максимальный 100 уровень!', true);
       removeItem('candy');
       mon.candiesEaten++;
       mon.happiness += 2;
@@ -6147,40 +6141,42 @@ function useItem(itemId) {
                     if (!mon.apiData.moves[emptySlot]) {
                       mon.apiData.moves[emptySlot] = { move: { name: entry.move.name, url } };
                     }
-                    alert(`${mon.nickname || mon.apiData.name} выучил ${entry.move.name}!`);
+                    showToast(`${mon.nickname || mon.apiData.name} выучил ${entry.move.name}!`, false);
                     knownNames.add(entry.move.name);
-                  } else if (confirm(`${mon.nickname || mon.apiData.name} хочет выучить ${entry.move.name}, но у него уже 4 атаки. Заменить первую?`)) {
-                    mon.apiData.moves[0].move = { name: entry.move.name, url: entry.move.url };
-                    knownNames.add(entry.move.name);
-                    alert(`${entry.move.name} выучено!`);
+                  } else {
+                    showConfirmModal('Новая атака!', `${mon.nickname || mon.apiData.name} хочет выучить ${entry.move.name}, но у него уже 4 атаки. Заменить первую?`, () => {
+                      mon.apiData.moves[0].move = { name: entry.move.name, url: entry.move.url };
+                      knownNames.add(entry.move.name);
+                      showToast(`${entry.move.name} выучено!`, false);
+                    });
                   }
                 }
                 break;
               }
             }
           }
-        } catch (e) {}
+        } catch (e) { console.warn('Failed to load level-up moves', e); }
       })();
       refreshProfileUI();
-      alert(`Вы скормили Сладкую Конфету! Уровень повышен до ${curLvl}.`);
+      showToast(`Вы скормили Сладкую Конфету! Уровень повышен до ${curLvl}.`, false);
       break;
     }
     case 'vitamin': {
-      if (mon.vitaminsEaten >= 10) return alert('Этот покемон уже съел максимум 10 витаминов!');
+      if (mon.vitaminsEaten >= 10) return showToast('Этот покемон уже съел максимум 10 витаминов!', true);
       removeItem('vitamin');
       mon.vitaminsEaten++;
       mon.happiness += 5;
       if (mon.happiness > 255) mon.happiness = 255;
       refreshProfileUI();
-      alert(`Вы скормили Витамин! Доступно +10 EV.`);
+      showToast(`Вы скормили Витамин! Доступно +10 EV.`, false);
       break;
     }
     case 'train': {
-      if (mon.trainingStage >= 6) return alert('Тренировка уже на Именной стадии!');
+      if (mon.trainingStage >= 6) return showToast('Тренировка уже на Именной стадии!', true);
       removeItem('train');
       const chances = [1.0, 0.8, 0.5, 0.3, 0.15, 0.05];
       if (Math.random() > chances[mon.trainingStage]) {
-        return alert(`Тренировка не удалась! Набор потрачен.`);
+        return showToast(`Тренировка не удалась! Набор потрачен.`, false);
       }
       const trainableStats = ['atk', 'def', 'spa', 'spd', 'spe'];
       mon.trainingStat = trainableStats[Math.floor(Math.random() * trainableStats.length)];
@@ -6188,11 +6184,11 @@ function useItem(itemId) {
       mon.happiness += 10;
       if (mon.happiness > 255) mon.happiness = 255;
       refreshProfileUI();
-      alert(`Успешно! Теперь это ${trainingStages[mon.trainingStage].name} тренировка!`);
+      showToast(`Успешно! Теперь это ${trainingStages[mon.trainingStage].name} тренировка!`, false);
       break;
     }
     case 'weaken': {
-      if (mon.trainingStage === 0) return alert('Покемон ещё не тренирован!');
+      if (mon.trainingStage === 0) return showToast('Покемон ещё не тренирован!', true);
       removeItem('weaken');
       mon.trainingStage--;
       if (mon.trainingStage === 0) mon.trainingStat = null;
@@ -6202,11 +6198,11 @@ function useItem(itemId) {
     case 'evolutionStone': {
       (async () => {
         const evoTarget = await checkEvolution(mon, true);
-        if (!evoTarget) return alert('Этот покемон не может эволюционировать!');
+        if (!evoTarget) return showToast('Этот покемон не может эволюционировать!', true);
         removeItem('evolutionStone');
         await triggerEvolution(mon, evoTarget.name);
         refreshProfileUI();
-        alert(`${mon.nickname || mon.apiData.name} эволюционировал в ${evoTarget.name}!`);
+        showToast(`${mon.nickname || mon.apiData.name} эволюционировал в ${evoTarget.name}!`, false);
       })();
       break;
     }
@@ -6239,56 +6235,56 @@ function useItem(itemId) {
     case 'iceStone': case 'dawnStone': {
       (async () => {
         const evoTarget = await checkEvolution(mon, true, itemId);
-        if (!evoTarget) return alert('Этот покемон не может эволюционировать с этим камнем!');
+        if (!evoTarget) return showToast('Этот покемон не может эволюционировать с этим камнем!', true);
         removeItem(itemId);
         await triggerEvolution(mon, evoTarget.name);
         refreshProfileUI();
-        alert(`${mon.nickname || mon.apiData.name} эволюционировал в ${evoTarget.name}!`);
+        showToast(`${mon.nickname || mon.apiData.name} эволюционировал в ${evoTarget.name}!`, false);
       })();
       break;
     }
     // Status cures — usable from backpack
     case 'antidote': {
-      if (!mon.status) return alert('У покемона нет статуса!');
-      if (mon.status !== 'poison') return alert('Антидот лечит только отравление!');
+      if (!mon.status) return showToast('У покемона нет статуса!', true);
+      if (mon.status !== 'poison') return showToast('Антидот лечит только отравление!', true);
       mon.status = null;
       removeItem(itemId);
       if (currentPokemonIndex !== null) refreshProfileUI();
-      alert(`${mon.nickname || mon.apiData.name} вылечен от отравления!`);
+      showToast(`${mon.nickname || mon.apiData.name} вылечен от отравления!`, false);
       break;
     }
     case 'antiparalyze': {
-      if (!mon.status) return alert('У покемона нет статуса!');
-      if (mon.status !== 'paralysis') return alert('Антипаралич лечит только паралич!');
+      if (!mon.status) return showToast('У покемона нет статуса!', true);
+      if (mon.status !== 'paralysis') return showToast('Антипаралич лечит только паралич!', true);
       mon.status = null;
       removeItem(itemId);
       if (currentPokemonIndex !== null) refreshProfileUI();
-      alert(`${mon.nickname || mon.apiData.name} вылечен от паралича!`);
+      showToast(`${mon.nickname || mon.apiData.name} вылечен от паралича!`, false);
       break;
     }
     case 'energyDrink': {
-      if (!mon.status) return alert('У покемона нет статуса!');
-      if (mon.status !== 'sleep') return alert('Энергетик лечит только сон!');
+      if (!mon.status) return showToast('У покемона нет статуса!', true);
+      if (mon.status !== 'sleep') return showToast('Энергетик лечит только сон!', true);
       mon.status = null;
       mon.sleepTurns = 0;
       removeItem(itemId);
       if (currentPokemonIndex !== null) refreshProfileUI();
-      alert(`${mon.nickname || mon.apiData.name} проснулся!`);
+      showToast(`${mon.nickname || mon.apiData.name} проснулся!`, false);
       break;
     }
     case 'fireExtinguisher': {
-      if (!mon.status) return alert('У покемона нет статуса!');
-      if (mon.status !== 'burn') return alert('Огнетушитель лечит только ожог!');
+      if (!mon.status) return showToast('У покемона нет статуса!', true);
+      if (mon.status !== 'burn') return showToast('Огнетушитель лечит только ожог!', true);
       mon.status = null;
       removeItem(itemId);
       if (currentPokemonIndex !== null) refreshProfileUI();
-      alert(`${mon.nickname || mon.apiData.name} вылечен от ожога!`);
+      showToast(`${mon.nickname || mon.apiData.name} вылечен от ожога!`, false);
       break;
     }
     case 'antiSputin': case 'healingHerb': {
-      if (!mon.status) return alert('У покемона нет статуса!');
+      if (!mon.status) return showToast('У покемона нет статуса!', true);
       const statusNames = { poison: 'отравления', paralysis: 'паралича', sleep: 'сна', burn: 'ожога', freeze: 'заморозки' };
-      alert(`${mon.nickname || mon.apiData.name} вылечен от ${statusNames[mon.status] || mon.status}!`);
+      showToast(`${mon.nickname || mon.apiData.name} вылечен от ${statusNames[mon.status] || mon.status}!`, false);
       mon.status = null;
       mon.sleepTurns = 0;
       removeItem(itemId);
@@ -6299,33 +6295,40 @@ function useItem(itemId) {
     case 'weakElixir': case 'elixir': case 'strongElixir': {
       const ppRestore = itemId === 'weakElixir' ? 10 : itemId === 'elixir' ? 20 : 40;
       if (!mon.movesPP || mon.movesPP.every(pp => !pp || pp.current >= pp.max)) {
-        return alert('Все PP уже максимальны!');
+        return showToast('Все PP уже максимальны!', true);
       }
       mon.movesPP.forEach(pp => {
         if (pp) pp.current = Math.min(pp.max, pp.current + ppRestore);
       });
       removeItem(itemId);
       if (currentPokemonIndex !== null) refreshProfileUI();
-      alert(`PP всех атак восстановлены на ${ppRestore}!`);
+      showToast(`PP всех атак восстановлены на ${ppRestore}!`, false);
       break;
     }
     // EXP Share - toggle distribution
     case 'expShare': {
       expShareActive = !expShareActive;
-      alert(expShareActive ? 'Распределитель опыта активирован! Команда будет получать 50% опыта.' : 'Распределитель опыта деактивирован.');
+      showToast(expShareActive ? 'Распределитель опыта активирован! Команда будет получать 50% опыта.' : 'Распределитель опыта деактивирован.', true);
       break;
     }
     // Lucky Egg - give to selected pokemon as held item
     case 'luckyEgg': {
-      if (mon.heldItem === 'luckyEgg') return alert('Покемон уже держит Счастливое яйцо!');
+      if (mon.heldItem === 'luckyEgg') return showToast('Покемон уже держит Счастливое яйцо!', true);
       if (mon.heldItem) {
-        if (!confirm(`Покемон уже держит ${itemDef(mon.heldItem).nameRu}. Заменить на Счастливое яйцо?`)) return;
-        addItem(mon.heldItem);
+        const heldName = itemDef(mon.heldItem).nameRu;
+        showConfirmModal('Заменить предмет?', `Покемон уже держит ${heldName}. Заменить на Счастливое яйцо?`, () => {
+          addItem(mon.heldItem);
+          removeItem('luckyEgg');
+          mon.heldItem = 'luckyEgg';
+          refreshProfileUI();
+          showToast(`${mon.nickname || mon.apiData.name} теперь держит Счастливое яйцо!`, false);
+        });
+        return;
       }
       removeItem('luckyEgg');
       mon.heldItem = 'luckyEgg';
       refreshProfileUI();
-      alert(`${mon.nickname || mon.apiData.name} теперь держит Счастливое яйцо!`);
+      showToast(`${mon.nickname || mon.apiData.name} теперь держит Счастливое яйцо!`, false);
       break;
     }
     // Crafting kit
@@ -6335,51 +6338,51 @@ function useItem(itemId) {
     }
     // Fishing rods - use on location
     case 'oldRod': case 'goodRod': case 'superRod': {
-      if (!getLocationHasWater()) return alert('Здесь негде рыбачить! Перейдите к водоёму.');
-      if (!myTeam.some(m => m.currentHp > 0)) return alert('Вам нужен хотя бы один живой покемон!');
+      if (!getLocationHasWater()) return showToast('Здесь негде рыбачить! Перейдите к водоёму.', true);
+      if (!myTeam.some(m => m.currentHp > 0)) return showToast('Вам нужен хотя бы один живой покемон!', true);
       startFishing(itemId);
       break;
     }
     // PP Up
     case 'ppUp': {
-      if (!mon.movesPP || mon.movesPP.length === 0) return alert('У покемона нет атак!');
+      if (!mon.movesPP || mon.movesPP.length === 0) return showToast('У покемона нет атак!', true);
       const movesWithPP = mon.movesPP.map((pp, i) => {
         const moveName = mon.apiData?.moves?.[i]?.move?.name || `Атака ${i + 1}`;
         return { ...pp, moveName, index: i };
       }).filter(m => m && m.max > 0);
-      if (movesWithPP.length === 0) return alert('Нет атак для усиления!');
-      const choice = prompt(
-        'Выберите атаку для увеличения PP:\n' +
-        movesWithPP.map(m => `${m.index + 1}. ${m.moveName} (PP: ${m.current}/${m.max})`).join('\n')
-      );
-      if (!choice) return;
-      const idx = parseInt(choice) - 1;
-      const picked = movesWithPP.find(m => m.index === idx);
-      if (!picked) return alert('Неверный выбор!');
-      const basePP = picked.max;
-      const newMax = Math.floor(basePP * 1.2);
-      if (newMax === basePP) return alert('PP уже на максимуме!');
-      mon.movesPP[idx].max = newMax;
-      mon.movesPP[idx].current = Math.min(mon.movesPP[idx].current + (newMax - basePP), newMax);
-      removeItem('ppUp');
-      refreshProfileUI();
-      alert(`PP атаки ${picked.moveName} увеличено до ${newMax}!`);
-      break;
+      if (movesWithPP.length === 0) return showToast('Нет атак для усиления!', true);
+      const ppItems = movesWithPP.map(m => ({
+        label: `${m.moveName}`,
+        subtitle: `PP: ${m.current}/${m.max}`
+      }));
+      showSelectionModal('Выберите атаку для PP Up', ppItems, (choiceIdx) => {
+        const picked = movesWithPP[choiceIdx];
+        if (!picked) { showToast('Неверный выбор!', true); return; }
+        const basePP = picked.max;
+        const newMax = Math.floor(basePP * 1.2);
+        if (newMax === basePP) { showToast('PP уже на максимуме!', true); return; }
+        mon.movesPP[picked.index].max = newMax;
+        mon.movesPP[picked.index].current = Math.min(mon.movesPP[picked.index].current + (newMax - basePP), newMax);
+        removeItem('ppUp');
+        refreshProfileUI();
+        showToast(`PP атаки ${picked.moveName} увеличено до ${newMax}!`, false);
+      }, true);
+      return;
     }
     // EV vitamins
     case 'protein': case 'iron': case 'calcium': case 'zinc': case 'carbos': {
       const evKey = itemId === 'protein' ? 'atk' : itemId === 'iron' ? 'def' : itemId === 'calcium' ? 'spa' : itemId === 'zinc' ? 'spd' : 'spe';
       const totalEV = Object.values(mon.evs).reduce((s, v) => s + v, 0);
-      if (mon.evs[evKey] >= 252) return alert(`EV ${evKey.toUpperCase()} уже на максимуме (252)!`);
-      if (totalEV >= 510) return alert('Суммарные EV уже на максимуме (510)!');
+      if (mon.evs[evKey] >= 252) return showToast(`EV ${evKey.toUpperCase()} уже на максимуме (252)!`, true);
+      if (totalEV >= 510) return showToast('Суммарные EV уже на максимуме (510)!', true);
       mon.evs[evKey] = Math.min(252, mon.evs[evKey] + 10);
       removeItem(itemId);
       if (currentPokemonIndex !== null) refreshProfileUI();
-      alert(`EV ${evKey.toUpperCase()} +10 (теперь ${mon.evs[evKey]})`);
+      showToast(`EV ${evKey.toUpperCase()} +10 (теперь ${mon.evs[evKey]})`, true);
       break;
     }
     default: {
-      alert(`${item.nameRu} скоро будет доступно!`);
+      showToast(`${item.nameRu} скоро будет доступно!`, true);
       break;
     }
   }
@@ -6404,53 +6407,47 @@ function openHeldItemPicker(monIndex) {
     return (item.category === 'battle' || item.category === 'berries') && getItemQty(item.id) > 0;
   });
 
-  let msg = `Выберите предмет для ${mon.nickname || mon.apiData.name}:\n`;
+  const selectionItems = choices.map((item) => ({
+    label: item.nameRu,
+    subtitle: item.desc
+  }));
   if (mon.heldItem) {
-    msg += `\nСейчас: ${getHeldItemName(mon.heldItem)}\n`;
-  }
-  choices.forEach((item, i) => {
-    msg += `\n${i + 1}. ${item.nameRu} - ${item.desc}`;
-  });
-  if (mon.heldItem) {
-    msg += `\n\n0. Снять предмет`;
+    selectionItems.unshift({ label: 'Снять предмет', subtitle: `Сейчас: ${getHeldItemName(mon.heldItem)}` });
   }
 
-  const choice = prompt(msg);
-  if (choice === null) return;
-
-  if (choice === '0' && mon.heldItem) {
-    // Return held item to inventory
-    const itemId = mon.heldItem;
-    addItem(itemId);
-    mon.heldItem = null;
-    if (mon.berries && mon.berries[itemId] !== undefined) mon.berries[itemId] = 0;
-    refreshProfileUI();
-    updateInventoryDisplay();
-    autoSave();
-    return;
-  }
-
-  const idx = parseInt(choice) - 1;
-  if (idx >= 0 && idx < choices.length) {
-    const chosen = choices[idx];
-    // Remove from inventory
-    removeItem(chosen.id);
-
-    // Return old held item if any
-    if (mon.heldItem) {
-      addItem(mon.heldItem);
-      if (mon.berries && mon.berries[mon.heldItem] !== undefined) mon.berries[mon.heldItem] = 0;
+  showSelectionModal(`Предмет для ${mon.nickname || mon.apiData.name}`, selectionItems, (selIdx) => {
+    if (mon.heldItem && selIdx === 0) {
+      // Remove held item
+      const itemId = mon.heldItem;
+      addItem(itemId);
+      mon.heldItem = null;
+      if (mon.berries && mon.berries[itemId] !== undefined) mon.berries[itemId] = 0;
+      refreshProfileUI();
+      updateInventoryDisplay();
+      autoSave();
+      return;
     }
 
-    mon.heldItem = chosen.id;
-    if (chosen.category === 'berries') {
-      if (!mon.berries) mon.berries = { sitrusBerry: 0, oranBerry: 0, lumBerry: 0, chestoBerry: 0, rawstBerry: 0 };
-      mon.berries[chosen.id] = 1;
+    const chosen = mon.heldItem ? choices[selIdx - 1] : choices[selIdx];
+    if (chosen) {
+      removeItem(chosen.id);
+
+      // Return old held item if any
+      if (mon.heldItem) {
+        addItem(mon.heldItem);
+        if (mon.berries && mon.berries[mon.heldItem] !== undefined) mon.berries[mon.heldItem] = 0;
+      }
+
+      mon.heldItem = chosen.id;
+      if (chosen.category === 'berries') {
+        if (!mon.berries) mon.berries = { sitrusBerry: 0, oranBerry: 0, lumBerry: 0, chestoBerry: 0, rawstBerry: 0 };
+        mon.berries[chosen.id] = 1;
+      }
+      refreshProfileUI();
+      updateInventoryDisplay();
+      autoSave();
     }
-    refreshProfileUI();
-    updateInventoryDisplay();
-    autoSave();
-  }
+  }, true);
 }
 
 function getTypeColor(type) {
@@ -6542,11 +6539,6 @@ function initProfileUXEvents() {
     }
   });
 
-  document.getElementById('qa-potion').addEventListener('click', () => document.getElementById('btn-use-potion-out').click());
-  document.getElementById('qa-candy').addEventListener('click', () => document.getElementById('btn-use-candy').click());
-  document.getElementById('qa-vitamin').addEventListener('click', () => document.getElementById('btn-use-vitamin').click());
-  document.getElementById('qa-train').addEventListener('click', () => document.getElementById('btn-use-train').click());
-  document.getElementById('qa-weaken').addEventListener('click', () => document.getElementById('btn-use-weaken').click());
 
   document.querySelectorAll('.reborn-ev-btn').forEach(btn => {
     btn.addEventListener('click', (e) => {
@@ -6573,7 +6565,7 @@ function initProfileUXEvents() {
         mon.evs[stat] += toAdd;
         refreshProfileUI();
       } else {
-        alert('Нет свободных EV! Дайте покемону Конфеты (+4 EV) или Витамины (+10 EV).');
+        showToast('Нет свободных EV! Дайте покемону Конфеты (+4 EV) или Витамины (+10 EV).', true);
       }
     });
   });
@@ -7077,7 +7069,7 @@ async function checkNewMovesOnLevelUp(pokemon, newLevel) {
             if (!pokemon.movesPP[slot]) pokemon.movesPP[slot] = {};
             pokemon.movesPP[slot] = { current: moveData.pp || 30, max: moveData.pp || 30 };
           }
-        } catch (e) {}
+        } catch (e) { console.warn('Failed to init PP for move', move.name, e); }
       }
     }
   } catch (e) {
@@ -7103,17 +7095,16 @@ function offerLearnMove(pokemon, move) {
     }
 
     // All slots full — ask which to replace
-    const slot = confirm(`${monName} хочет выучить ${moveName}, но знает уже 4 атаки.\n\nНажмите OK чтобы заменить первую атаку, Отмена чтобы пропустить.`);
-    if (slot) {
-      // Replace slot 0 (simplest approach — could be a UI picker)
+    showConfirmModal('Новая атака!', `${monName} хочет выучить ${moveName}, но знает уже 4 атаки. Заменить первую?`, () => {
       const url = move.url || `https://pokeapi.co/api/v2/move/${moveName}/`;
+      const oldMove = pokemon.apiData.moves[0]?.move?.name || 'неизвестную атаку';
       pokemon.apiData.moves[0].move = { name: moveName, url };
-      appendToLog(`${monName} забыл ${pokemon.apiData.moves[0].move.name} и выучил ${moveName}!`, false, 'system');
+      appendToLog(`${monName} забыл ${oldMove} и выучил ${moveName}!`, false, 'system');
       resolve(true);
-    } else {
+    }, () => {
       appendToLog(`${monName} не стал учить ${moveName}.`, false, 'system');
       resolve(false);
-    }
+    });
   });
 }
 
@@ -7121,8 +7112,8 @@ function offerLearnMove(pokemon, move) {
 // FEATURE: TM MOVE RELEARNER
 // ================================================================
 async function openMoveRelearner() {
-  if (currentPokemonIndex === null) return alert('Сначала выберите покемона во вкладке "Команда"!');
-  if (getItemQty('tm') <= 0) return alert('У вас нет TM-совместимости!');
+  if (currentPokemonIndex === null) return showToast('Сначала выберите покемона во вкладке "Команда"!', true);
+  if (getItemQty('tm') <= 0) return showToast('У вас нет TM-совместимости!', true);
 
   const mon = myTeam[currentPokemonIndex];
   const modal = document.getElementById('tm-modal');
@@ -7208,7 +7199,7 @@ function showSlotPicker(mon, moveData) {
       document.getElementById('tm-slot-picker').style.display = 'none';
       document.getElementById('tm-modal').style.display = 'none';
       autoSave();
-      alert(`${mon.nickname || mon.apiData.name} выучил ${moveData.name}!`);
+      showToast(`${mon.nickname || mon.apiData.name} выучил ${moveData.name}!`, false);
     });
     picker.appendChild(btn);
   }
@@ -7296,18 +7287,18 @@ function initSellTab() {
     const itemId = btn.getAttribute('data-item');
     const sellPrice = Math.floor((shopPrices[itemId] || 100) / 2);
     const itemData = ITEMS.find(i => i.id === itemId);
-    if (!confirm(`Продать 1 ${itemData ? itemData.nameRu : itemId} за ¥${sellPrice}?`)) return;
-
-    if (!removeItem(itemId)) {
-      return alert('Не удалось продать предмет!');
-    }
-
-    money += sellPrice;
-    document.getElementById('shop-money-display').innerText = money;
-    updateInventoryDisplay();
-    updateMoneyDisplay();
-    autoSave();
-    renderSell();
+    showConfirmModal('Продать предмет?', `Продать 1 ${itemData ? itemData.nameRu : itemId} за ¥${sellPrice.toLocaleString()}?`, () => {
+      if (!removeItem(itemId)) {
+        showToast('Не удалось продать предмет!', true);
+        return;
+      }
+      money += sellPrice;
+      document.getElementById('shop-money-display').innerText = money;
+      updateInventoryDisplay();
+      updateMoneyDisplay();
+      autoSave();
+      renderSell();
+    });
   });
 }
 
@@ -7315,18 +7306,13 @@ function initSellTab() {
 // FEATURE: NICKNAME
 // ================================================================
 function editNickname() {
-  if (currentPokemonIndex === null) return alert('Сначала выберите покемона!');
+  if (currentPokemonIndex === null) return showToast('Сначала выберите покемона!', true);
   const mon = myTeam[currentPokemonIndex];
-  const newName = prompt('Введите новое прозвище:', mon.nickname || '');
-  if (newName !== null && newName.trim() !== '') {
-    mon.nickname = newName.trim();
+  showTextInputModal('Новое прозвище', mon.nickname || '', (newName) => {
+    mon.nickname = newName;
     refreshProfileUI();
     autoSave();
-  } else if (newName !== null && newName.trim() === '') {
-    mon.nickname = null;
-    refreshProfileUI();
-    autoSave();
-  }
+  });
 }
 
 // ================================================================
@@ -7577,6 +7563,155 @@ function showToast(msg, isError) {
   toast.style.opacity = '1';
   clearTimeout(toast._timeout);
   toast._timeout = setTimeout(() => { toast.style.opacity = '0'; }, 2500);
+}
+
+// --- Reusable Modal Helpers ---
+
+function showConfirmModal(title, message, onConfirm, onCancel) {
+  const modal = document.createElement('div');
+  modal.className = 'modal-overlay';
+  modal.style.display = 'flex';
+  modal.innerHTML = `
+    <div class="confirm-modal-card">
+      <h3>${title}</h3>
+      <p>${message}</p>
+      <div class="confirm-modal-buttons">
+        <button class="confirm-btn confirm-btn-yes" id="confirm-yes">Да</button>
+        <button class="confirm-btn confirm-btn-no" id="confirm-no">Отмена</button>
+      </div>
+    </div>
+  `;
+  document.body.appendChild(modal);
+
+  const cleanup = () => {
+    document.getElementById('confirm-yes').removeEventListener('click', onYes);
+    document.getElementById('confirm-no').removeEventListener('click', onNo);
+    modal.removeEventListener('click', onOverlay);
+    if (modal.parentNode) modal.parentNode.removeChild(modal);
+  };
+  const onYes = () => { cleanup(); if (onConfirm) onConfirm(); };
+  const onNo = () => { cleanup(); if (onCancel) onCancel(); };
+  const onOverlay = (e) => { if (e.target === modal) onNo(); };
+
+  document.getElementById('confirm-yes').addEventListener('click', onYes);
+  document.getElementById('confirm-no').addEventListener('click', onNo);
+  modal.addEventListener('click', onOverlay);
+}
+
+function showSelectionModal(title, items, callback, allowCancel) {
+  const modal = document.createElement('div');
+  modal.className = 'modal-overlay';
+  modal.style.display = 'flex';
+  const itemsHTML = items.map((item, i) => `
+    <button class="selection-item-btn" data-index="${i}">
+      ${item.label}
+      ${item.subtitle ? `<span class="item-subtitle">${item.subtitle}</span>` : ''}
+    </button>
+  `).join('');
+  modal.innerHTML = `
+    <div class="selection-modal-card">
+      <h3>${title}</h3>
+      <div class="selection-items">${itemsHTML}</div>
+      ${allowCancel ? '<button class="confirm-btn confirm-btn-no" id="selection-cancel" style="width:100%;margin-top:8px;">Отмена</button>' : ''}
+    </div>
+  `;
+  document.body.appendChild(modal);
+
+  const cleanup = () => {
+    modal.querySelectorAll('.selection-item-btn').forEach(btn => {
+      btn.removeEventListener('click', onItemClick);
+    });
+    if (allowCancel) {
+      document.getElementById('selection-cancel').removeEventListener('click', onCancelClick);
+    }
+    modal.removeEventListener('click', onOverlay);
+    if (modal.parentNode) modal.parentNode.removeChild(modal);
+  };
+
+  const onItemClick = (e) => {
+    const idx = parseInt(e.currentTarget.getAttribute('data-index'));
+    cleanup();
+    if (callback) callback(idx);
+  };
+  const onCancelClick = () => { cleanup(); };
+  const onOverlay = (e) => { if (e.target === modal) { cleanup(); } };
+
+  modal.querySelectorAll('.selection-item-btn').forEach(btn => {
+    btn.addEventListener('click', onItemClick);
+  });
+  if (allowCancel) {
+    document.getElementById('selection-cancel').addEventListener('click', onCancelClick);
+  }
+  modal.addEventListener('click', onOverlay);
+}
+
+function showTextInputModal(title, defaultText, callback) {
+  const modal = document.createElement('div');
+  modal.className = 'modal-overlay';
+  modal.style.display = 'flex';
+  modal.innerHTML = `
+    <div class="selection-modal-card">
+      <h3>${title}</h3>
+      <input type="text" class="text-input-modal" id="text-input-field" value="${defaultText || ''}" maxlength="20" autocomplete="off">
+      <div class="confirm-modal-buttons" style="margin-top:12px;">
+        <button class="confirm-btn confirm-btn-yes" id="text-input-ok">OK</button>
+        <button class="confirm-btn confirm-btn-no" id="text-input-cancel">Отмена</button>
+      </div>
+    </div>
+  `;
+  document.body.appendChild(modal);
+  const input = document.getElementById('text-input-field');
+  input.focus();
+  input.select();
+
+  const cleanup = () => {
+    document.getElementById('text-input-ok').removeEventListener('click', onOk);
+    document.getElementById('text-input-cancel').removeEventListener('click', onCancel);
+    modal.removeEventListener('click', onOverlay);
+    input.removeEventListener('keydown', onKey);
+    if (modal.parentNode) modal.parentNode.removeChild(modal);
+  };
+  const submit = () => {
+    const val = input.value.trim();
+    cleanup();
+    if (callback && val) callback(val);
+  };
+  const onOk = () => submit();
+  const onCancel = () => { cleanup(); };
+  const onOverlay = (e) => { if (e.target === modal) { cleanup(); } };
+  const onKey = (e) => { if (e.key === 'Enter') submit(); if (e.key === 'Escape') cleanup(); };
+
+  document.getElementById('text-input-ok').addEventListener('click', onOk);
+  document.getElementById('text-input-cancel').addEventListener('click', onCancel);
+  modal.addEventListener('click', onOverlay);
+  input.addEventListener('keydown', onKey);
+}
+
+function showItemInfoModal(item, qty) {
+  const priceInfo = item.price > 0 ? `\n💰 Цена: ${item.price.toLocaleString()} кр.` : '';
+  const sellInfo = item.sellPrice > 0 ? `\n🏷️ Продажа: ${item.sellPrice.toLocaleString()} кр.` : '';
+  const modal = document.createElement('div');
+  modal.className = 'modal-overlay';
+  modal.style.display = 'flex';
+  modal.innerHTML = `
+    <div class="item-info-card">
+      <h3>📦 ${item.nameRu}</h3>
+      <p>📝 ${item.desc}</p>
+      <div class="item-info-details">📊 Кол-во: ${qty}${priceInfo}${sellInfo}</div>
+      <button class="tma-btn" id="btn-item-info-close" style="width:100%;margin-top:12px;">Закрыть</button>
+    </div>
+  `;
+  document.body.appendChild(modal);
+
+  const cleanup = () => {
+    document.getElementById('btn-item-info-close').removeEventListener('click', cleanup);
+    modal.removeEventListener('click', onOverlay);
+    if (modal.parentNode) modal.parentNode.removeChild(modal);
+  };
+  const onOverlay = (e) => { if (e.target === modal) cleanup(); };
+
+  document.getElementById('btn-item-info-close').addEventListener('click', cleanup);
+  modal.addEventListener('click', onOverlay);
 }
 
 function initTradeSocket() {
