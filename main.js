@@ -667,13 +667,13 @@ const natures = [
 ];
 
 const trainingStages = [
-  { name: 'Отсутствует', pct: 0 },
-  { name: 'Начальная', pct: 10 },
-  { name: 'Расширенная', pct: 18 },
-  { name: 'Мастерская', pct: 25 },
-  { name: 'Знаменитая', pct: 31 },
-  { name: 'Легендарная', pct: 36 },
-  { name: 'Именная', pct: 40 }
+  { name: 'Отсутствует', pct: 0, color: '#888' },
+  { name: 'Начальная', pct: 10, color: '#8090E8' },
+  { name: 'Расширенная', pct: 18, color: '#4088D0' },
+  { name: 'Мастерская', pct: 25, color: '#18A8C8' },
+  { name: 'Знаменитая', pct: 31, color: '#10C048' },
+  { name: 'Легендарная', pct: 36, color: '#E0A800' },
+  { name: 'Именная', pct: 40, color: '#E84000' }
 ];
 
 // ==================== ITEMS DATABASE ====================
@@ -2076,7 +2076,7 @@ function checkDaycare() {
   const now = Date.now();
   daycareMons.forEach(entry => {
     const hoursPassed = (now - entry.depositTime) / (1000 * 60 * 60);
-    if (hoursPassed >= 1 && entry.mon.baseLevel < 100) {
+    if (hoursPassed >= 1 && entry.mon.baseLevel + (entry.mon.candiesEaten || 0) < 100) {
       const levelsGained = Math.floor(hoursPassed);
       if (levelsGained > 0 && levelsGained > (entry._lastLevelsGained || 0)) {
         const newLevels = levelsGained - (entry._lastLevelsGained || 0);
@@ -2159,7 +2159,7 @@ function showPCInfoModal(mon) {
         <b>IV:</b> HP:${ivs.hp||0} АТК:${ivs.atk||0} ЗАЩ:${ivs.def||0} СП.АТК:${ivs.spa||0} СП.ЗАЩ:${ivs.spd||0} СКОР:${ivs.spe||0}
       </div>
       <p style="font-size:0.8rem;color:var(--tma-text-muted);">Атаки: ${moves}</p>
-      ${mon.trainingStage > 0 ? `<p style="font-size:0.8rem;color:#fc0;">Тренировка: ${trainingStages[mon.trainingStage].name} (+${trainingStages[mon.trainingStage].pct}%)</p>` : ''}
+      ${mon.trainingStage > 0 ? `<p style="font-size:0.8rem;color:${trainingStages[mon.trainingStage].color};">Тренировка: ${trainingStages[mon.trainingStage].name} (+${trainingStages[mon.trainingStage].pct}%)</p>` : ''}
       <button class="tma-btn" id="btn-pc-info-close" style="width:100%;margin-top:12px;">Закрыть</button>
     </div>
   `;
@@ -4199,20 +4199,23 @@ async function useMove(moveIndex) {
       activePlayerMon.expToNext = Math.pow(activePlayerMon.baseLevel + 1, 3);
     }
 
-    activePlayerMon.exp += expGain;
-    appendToLog(`${activePlayerMon.apiData.name} получил ${expGain} EXP!`);
+    const monLvl = activePlayerMon.baseLevel + (activePlayerMon.candiesEaten || 0);
+    if (monLvl < 100) {
+      activePlayerMon.exp += expGain;
+      appendToLog(`${activePlayerMon.apiData.name} получил ${expGain} EXP!`);
+    }
 
     // expShare: 50% EXP to non-active team members
     if (expShareActive) {
       const shareExp = Math.floor(expGain / 2);
       myTeam.forEach(mon => {
-        if (mon !== activePlayerMon && mon.currentHp > 0 && mon.baseLevel < 100) {
+        if (mon !== activePlayerMon && mon.currentHp > 0 && (mon.baseLevel + (mon.candiesEaten || 0)) < 100) {
           if (mon.exp === undefined) {
             mon.exp = Math.pow(mon.baseLevel, 3);
             mon.expToNext = Math.pow(mon.baseLevel + 1, 3);
           }
           mon.exp += shareExp;
-          while (mon.exp >= mon.expToNext && mon.baseLevel < 100) {
+          while (mon.exp >= mon.expToNext && (mon.baseLevel + (mon.candiesEaten || 0)) < 100) {
             mon.baseLevel++;
             mon.expToNext = Math.pow(mon.baseLevel + 1, 3);
             const oldMax = mon.maxHp;
@@ -5126,19 +5129,22 @@ async function useMoveGym(moveIndex) {
       activePlayerMon.exp = Math.pow(activePlayerMon.baseLevel, 3);
       activePlayerMon.expToNext = Math.pow(activePlayerMon.baseLevel + 1, 3);
     }
-    activePlayerMon.exp += expGain;
-    appendToLog(`${activePlayerMon.apiData.name} получил ${expGain} EXP!`);
+    const mLvl = activePlayerMon.baseLevel + (activePlayerMon.candiesEaten || 0);
+    if (mLvl < 100) {
+      activePlayerMon.exp += expGain;
+      appendToLog(`${activePlayerMon.apiData.name} получил ${expGain} EXP!`);
+    }
 
     if (expShareActive) {
       const shareExp = Math.floor(expGain / 2);
       myTeam.forEach(mon => {
-        if (mon !== activePlayerMon && mon.currentHp > 0 && mon.baseLevel < 100) {
+        if (mon !== activePlayerMon && mon.currentHp > 0 && (mon.baseLevel + (mon.candiesEaten || 0)) < 100) {
           if (mon.exp === undefined) {
             mon.exp = Math.pow(mon.baseLevel, 3);
             mon.expToNext = Math.pow(mon.baseLevel + 1, 3);
           }
           mon.exp += shareExp;
-          while (mon.exp >= mon.expToNext && mon.baseLevel < 100) {
+          while (mon.exp >= mon.expToNext && (mon.baseLevel + (mon.candiesEaten || 0)) < 100) {
             mon.baseLevel++;
             mon.expToNext = Math.pow(mon.baseLevel + 1, 3);
             const om = mon.maxHp;
@@ -5857,9 +5863,8 @@ function renderTeamGrid() {
       const types = mon.apiData.types;
       const typeBg = getTypeGradient(types);
       const trainStage = mon.trainingStage || 0;
-      const trainColors = ['#888', '#aaa', '#8af', '#5cf', '#0cf', '#fc0', '#f80'];
       const trainArrow = trainStage > 0
-        ? `<div class="train-arrow" style="color:${trainColors[trainStage]};" title="Тренировка: ${trainingStages[trainStage].name} (+${trainingStages[trainStage].pct}%)">▲</div>`
+        ? `<div class="train-arrow" style="color:${trainingStages[trainStage].color};" title="Тренировка: ${trainingStages[trainStage].name} (+${trainingStages[trainStage].pct}%)">▲</div>`
         : '';
       slot.innerHTML = `
         ${reorderHtml}
@@ -7592,9 +7597,12 @@ function initSellTab() {
         <div class="shop-item-icon">${item.icon}</div>
         <div class="shop-item-info">
           <div class="shop-item-name">${item.name} (x${item.qty})</div>
-          <div class="shop-item-price">Продажа: ¥${sellPrice}</div>
+          <div class="shop-item-price">Продажа: ¥${sellPrice}/шт</div>
         </div>
-        <button class="btn-use shop-sell-btn" data-item="${item.id}" ${item.qty <= 0 ? 'disabled' : ''}>Продать</button>
+        <div class="shop-qty-wrap">
+          <input type="number" class="shop-qty-input shop-sell-qty" value="1" min="1" max="${item.qty}" data-item="${item.id}">
+          <button class="btn-use shop-sell-btn" data-item="${item.id}" ${item.qty <= 0 ? 'disabled' : ''}>Продать</button>
+        </div>
       `;
       container.appendChild(div);
     });
@@ -7636,17 +7644,22 @@ function initSellTab() {
     const itemId = btn.getAttribute('data-item');
     const sellPrice = Math.floor((shopPrices[itemId] || 100) / 2);
     const itemData = ITEMS.find(i => i.id === itemId);
-    showConfirmModal('Продать предмет?', `Продать 1 ${itemData ? itemData.nameRu : itemId} за ¥${sellPrice.toLocaleString()}?`, () => {
-      if (!removeItem(itemId)) {
-        showToast('Не удалось продать предмет!', true);
-        return;
+    const qtyInput = document.querySelector(`.shop-sell-qty[data-item="${itemId}"]`);
+    const qty = Math.max(1, Math.min(inventory[itemId] || 1, parseInt(qtyInput?.value) || 1));
+    const total = sellPrice * qty;
+    showConfirmModal('Продать предмет?', `Продать ${qty}x ${itemData ? itemData.nameRu : itemId} за ¥${total.toLocaleString()}?`, () => {
+      let sold = 0;
+      for (let i = 0; i < qty; i++) {
+        if (!removeItem(itemId)) break;
+        sold++;
       }
-      money += sellPrice;
+      money += sellPrice * sold;
       document.getElementById('shop-money-display').innerText = money;
       updateInventoryDisplay();
       updateMoneyDisplay();
       autoSave();
       renderSell();
+      if (sold > 0) showToast(`Продано ${sold}x! +¥${sellPrice * sold}`, false);
     });
   });
 }
