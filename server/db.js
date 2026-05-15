@@ -81,6 +81,23 @@ export async function initDB() {
     );
   `);
 
+  // Migrations — add columns that might be missing from old DB
+  const migrations = [
+    `ALTER TABLE users ADD COLUMN nickname TEXT DEFAULT ''`,
+    `ALTER TABLE users ADD COLUMN avatar TEXT DEFAULT '👤'`,
+    `ALTER TABLE users ADD COLUMN starter_pokemon TEXT DEFAULT ''`,
+    `ALTER TABLE users ADD COLUMN registered INTEGER DEFAULT 0`,
+    `ALTER TABLE users ADD COLUMN registered_at TEXT DEFAULT ''`,
+    `ALTER TABLE leaderboard ADD COLUMN pokemon_count INTEGER DEFAULT 0`,
+    `ALTER TABLE leaderboard ADD COLUMN legendary_count INTEGER DEFAULT 0`,
+  ];
+  for (const sql of migrations) {
+    try { await db.run(sql); } catch (e) {
+      // Column already exists — ignore
+      if (!e.message.includes('duplicate column')) console.log('Migration skip:', e.message.slice(0,60));
+    }
+  }
+
   console.log('Database initialized');
   return db;
 }
