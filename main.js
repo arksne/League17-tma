@@ -7976,6 +7976,16 @@ async function sendChatMessage() {
 // TRAINER CARD
 // ================================================================
 function renderTrainerCard() {
+  // Chat sidebar: online players
+  const onlineList = document.getElementById('chat-online-list');
+  if (onlineList) {
+    onlineList.innerHTML = onlinePlayersList.length === 0
+      ? '<span style="color:var(--tma-text-muted)">-</span>'
+      : onlinePlayersList.map(p => `<div style="padding:2px 0;">🟢 ${p.username||'Тренер'}</div>`).join('');
+  }
+  const countEl = document.getElementById('chat-online-count');
+  if (countEl) countEl.innerText = onlinePlayersList.length > 0 ? `(${onlinePlayersList.length})` : '';
+  // Old trainer card elements hidden
   const nameEl = document.getElementById('trainer-name');
   const moneyEl = document.getElementById('trainer-money');
   const badgesEl = document.getElementById('trainer-badges');
@@ -8465,6 +8475,7 @@ function initTradeSocket() {
   socket.on('online_players', (players) => {
     onlinePlayersList = players.filter(p => p.id !== socket.id);
     renderTradePlayerList();
+    renderTrainerCard();
   });
 
   socket.on('trade_request_received', (data) => {
