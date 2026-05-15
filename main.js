@@ -7414,6 +7414,18 @@ async function authTelegram() {
     const data = await res.json();
     tgToken = data.token;
     tgUser = data.user;
+
+    // Detect account switch — clean old data to prevent mixing
+    const prevId = localStorage.getItem('league17_trainer_id');
+    if (prevId && String(tgUser.id) !== prevId) {
+      console.warn('[auth] Account switch detected:', prevId, '→', tgUser.id);
+      // Clear all old localStorage data for previous account
+      const keysToClear = ['save','save_ts','save_v','save_sync','save_corrupted','theme','quest_date','avatar','nickname_'];
+      const oldTrainer = prevId;
+      keysToClear.forEach(k => {
+        try { localStorage.removeItem(`league17_${k}_${oldTrainer}`); } catch(e) {}
+      });
+    }
     localStorage.setItem('league17_trainer_id', String(tgUser.id));
 
     hideLoginScreen();
