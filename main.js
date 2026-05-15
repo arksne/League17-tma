@@ -7476,12 +7476,30 @@ async function doCloudSave(attempt = 0) {
     });
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const result = await res.json();
-    // Server has newer data — reload from server immediately
-    if (result.error === 'stale_save') {
-      console.warn('[sync] Server rejected stale save, reloading from server...');
+
+    // Server rejected: data is stale — RELOAD from server immediately
+    if (!result.success && result.error === 'stale_save') {
+      console.warn('[sync] Server rejected save v' + saveVersion + ' (server has v' + result.serverVersion + '). Reloading...');
       const cloudData = await cloudLoad();
-      if (cloudData) applyCloudSave(cloudData);
+      if (cloudData) {
+        applyCloudSave(cloudData);
+        // Re-save reconciled state
+        saveGame();
+        // Refresh UI
+        renderLocation(currentLocationId);
+        renderTeamGrid();
+        updateInventoryDisplay();
+        updateMoneyDisplay();
+        updateBadgeDisplay();
+        renderTrainerCard();
+      }
       return result;
+    }
+
+    // Success: sync version with server
+    if (result.serverVersion) {
+      saveVersion = result.serverVersion;
+      localStorage.setItem(lsKey('save_v'), String(saveVersion));
     }
     lastCloudSync = Date.now();
     saveRetryCount = 0;
