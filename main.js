@@ -2061,6 +2061,13 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
   }
 
+  // Safety: if no pokemon after load, give starter
+  if (!myTeam || myTeam.length === 0 || !myTeam.some(m => m && m.apiData)) {
+    console.warn('No valid pokemon in team, giving starter');
+    myTeam = [];
+    await giveStarter();
+  }
+
   renderLocation(currentLocationId);
   renderTeamGrid();
   updateInventoryDisplay();
@@ -2189,23 +2196,19 @@ document.addEventListener('DOMContentLoaded', async () => {
     setTimeout(() => cloudSave(), 2000);
   }
 
-  // Trainer profile modal close
-  const btnCloseTrainer = document.getElementById('btn-close-trainer-profile');
-  if (btnCloseTrainer) {
-    btnCloseTrainer.addEventListener('click', () => {
-      document.getElementById('trainer-profile-modal').style.display = 'none';
-    });
-  }
-
-  // Click overlay to close trainer profile modal
-  const trainerModal = document.getElementById('trainer-profile-modal');
-  if (trainerModal) {
-    trainerModal.addEventListener('click', (e) => {
-      if (e.target === trainerModal) {
-        trainerModal.style.display = 'none';
-      }
-    });
-  }
+  // Trainer profile modal close — use event delegation (always works)
+  document.addEventListener('click', (e) => {
+    // Close button
+    if (e.target.closest('#btn-close-trainer-profile')) {
+      const modal = document.getElementById('trainer-profile-modal');
+      if (modal) modal.style.display = 'none';
+      return;
+    }
+    // Overlay click
+    if (e.target.id === 'trainer-profile-modal') {
+      e.target.style.display = 'none';
+    }
+  });
 
   // Starter modal overlay click to close
   const starterModal = document.getElementById('starter-modal');
@@ -7537,10 +7540,16 @@ async function cloudLoad() {
 function applyCloudSave(data) {
   if (!data || !data.myTeam) return;
   const cloudV = data._v || 0;
-  if (cloudV <= saveVersion) return; // Server is older or same — skip
+  // ALWAYS apply if server has more pokemon or more money (regardless of version)
+  const localTeamCount = myTeam.length;
+  const cloudTeamCount = data.myTeam.length;
+  const localMoney = money || 0;
+  const cloudMoney = data.money || 0;
+  const shouldApply = cloudV > saveVersion || cloudTeamCount > localTeamCount || cloudMoney > localMoney;
 
-  // Server has newer data — use it
-  console.log(`[sync] Server v${cloudV} > local v${saveVersion} — applying server data`);
+  if (!shouldApply && cloudV <= saveVersion) return;
+
+  console.log(`[sync] Applying server data (v${cloudV}, ${cloudTeamCount} mons, ${cloudMoney} money)`);
   currentLocationId = data.currentLocationId || currentLocationId;
   currentRegion = data.currentRegion || currentRegion;
   if (data.inventory) inventory = { ...data.inventory };
