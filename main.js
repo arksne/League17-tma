@@ -2850,10 +2850,16 @@ async function giveStarter() {
     div.addEventListener('mouseenter', () => div.style.transform = 'scale(1.05)');
     div.addEventListener('mouseleave', () => div.style.transform = 'scale(1)');
 
-    div.addEventListener('click', () => {
+    div.addEventListener('click', async () => {
       const chosenStarter = gen[Math.floor(Math.random() * gen.length)];
       modal.style.display = 'none';
-      giveStarterMon(chosenStarter);
+      await giveStarterMon(chosenStarter);
+      renderTeamGrid();
+      renderLocation(currentLocationId);
+      updateInventoryDisplay();
+      updateMoneyDisplay();
+      saveGame();
+      cloudSave();
       showToast(`Вам выпал покемон: ${chosenStarter.toUpperCase()}! (Gen ${idx + 1})`, false);
     });
     grid.appendChild(div);
