@@ -1504,6 +1504,77 @@ const gymLeaders = {
       { name: 'mewtwo', level: 50, move1: 'psychic', move2: 'barrier' }
     ],
     badgeName: 'Earth Badge', moneyReward: 5000
+  },
+  // --- Johto Gym Leaders ---
+  flourence: {
+    name: 'Фолкнер', title: 'Лидер Зала Флоренса', type: 'flying',
+    team: [
+      { name: 'pidgey', level: 9, move1: 'gust', move2: 'sand-attack' },
+      { name: 'pidgeotto', level: 13, move1: 'gust', move2: 'quick-attack' }
+    ],
+    badgeName: 'Zephyr Badge', moneyReward: 1800
+  },
+  alston: {
+    name: 'Багси', title: 'Лидер Зала Алстона', type: 'bug',
+    team: [
+      { name: 'metapod', level: 14, move1: 'tackle', move2: 'harden' },
+      { name: 'kakuna', level: 14, move1: 'poison-sting', move2: 'harden' },
+      { name: 'scyther', level: 16, move1: 'quick-attack', move2: 'slash' }
+    ],
+    badgeName: 'Hive Badge', moneyReward: 2000
+  },
+  goldenrod: {
+    name: 'Уитни', title: 'Лидер Зала Голденрода', type: 'normal',
+    team: [
+      { name: 'clefairy', level: 18, move1: 'doubleslap', move2: 'sing' },
+      { name: 'miltank', level: 20, move1: 'stomp', move2: 'milk-drink' }
+    ],
+    badgeName: 'Plain Badge', moneyReward: 2500
+  },
+  warhall: {
+    name: 'Морти', title: 'Лидер Зала Вархолла', type: 'ghost',
+    team: [
+      { name: 'gastly', level: 21, move1: 'night-shade', move2: 'hypnosis' },
+      { name: 'haunter', level: 21, move1: 'shadow-ball', move2: 'lick' },
+      { name: 'gengar_2', level: 25, move1: 'shadow-ball', move2: 'hypnosis' }
+    ],
+    badgeName: 'Fog Badge', moneyReward: 2800
+  },
+  ostaron: {
+    name: 'Чак', title: 'Лидер Зала Остарона', type: 'fighting',
+    team: [
+      { name: 'primeape', level: 27, move1: 'karate-chop', move2: 'low-kick' },
+      { name: 'poliwrath', level: 30, move1: 'submission', move2: 'hypnosis' }
+    ],
+    badgeName: 'Storm Badge', moneyReward: 3000
+  },
+  olivine: {
+    name: 'Жасмин', title: 'Лидер Зала Оливина', type: 'steel',
+    team: [
+      { name: 'magnemite', level: 30, move1: 'thunder-shock', move2: 'sonic-boom' },
+      { name: 'magnemite_2', level: 30, move1: 'thunder-shock', move2: 'supersonic' },
+      { name: 'steelix', level: 35, move1: 'rock-throw', move2: 'bind' }
+    ],
+    badgeName: 'Mineral Badge', moneyReward: 3500
+  },
+  sayref: {
+    name: 'Прайс', title: 'Лидер Зала Сайрефа', type: 'ice',
+    team: [
+      { name: 'seel', level: 31, move1: 'aurora-beam', move2: 'headbutt' },
+      { name: 'dewgong', level: 33, move1: 'ice-beam', move2: 'headbutt' },
+      { name: 'piloswine', level: 34, move1: 'ice-beam', move2: 'take-down' }
+    ],
+    badgeName: 'Glacier Badge', moneyReward: 3800
+  },
+  margarita: {
+    name: 'Клер', title: 'Лидер Зала Маргариты', type: 'dragon',
+    team: [
+      { name: 'dragonair', level: 37, move1: 'dragon-rage', move2: 'thunderbolt' },
+      { name: 'dragonair_2', level: 37, move1: 'dragon-rage', move2: 'surf' },
+      { name: 'gyarados', level: 38, move1: 'hydro-pump', move2: 'dragon-rage' },
+      { name: 'kingdra', level: 40, move1: 'hydro-pump', move2: 'hyper-beam' }
+    ],
+    badgeName: 'Rising Badge', moneyReward: 4500
   }
 };
 
@@ -1564,6 +1635,67 @@ const champion = {
     { name: 'exeggutor', level: 61, move1: 'psychic', move2: 'hypnosis' },
     { name: 'gyarados', level: 63, move1: 'hydro-pump', move2: 'hyper-beam' },
     { name: 'blastoise', level: 65, move1: 'hydro-pump', move2: 'skull-bash' }
+  ],
+  moneyReward: 10000
+};
+
+// JOHTO ELITE FOUR
+const johtoEliteFour = [
+  {
+    name: 'Уилл', title: 'Элитная Четверка Джото — Экстрасенс', type: 'psychic',
+    team: [
+      { name: 'xatu', level: 40, move1: 'psychic', move2: 'confuse-ray' },
+      { name: 'exeggutor', level: 41, move1: 'psychic', move2: 'hypnosis' },
+      { name: 'slowbro', level: 41, move1: 'surf', move2: 'psychic' },
+      { name: 'jynx', level: 41, move1: 'ice-punch', move2: 'psychic' },
+      { name: 'xatu', level: 42, move1: 'psychic', move2: 'fly' }
+    ],
+    moneyReward: 5000
+  },
+  {
+    name: 'Кога', title: 'Элитная Четверка Джото — Яд', type: 'poison',
+    team: [
+      { name: 'ariados', level: 40, move1: 'sludge-bomb', move2: 'spider-web' },
+      { name: 'venomoth', level: 41, move1: 'psychic', move2: 'gust' },
+      { name: 'muk', level: 42, move1: 'sludge', move2: 'minimize' },
+      { name: 'weezing', level: 43, move1: 'sludge', move2: 'explosion' },
+      { name: 'crobat', level: 44, move1: 'wing-attack', move2: 'poison-fang' }
+    ],
+    moneyReward: 6000
+  },
+  {
+    name: 'Бруно', title: 'Элитная Четверка Джото — Бой', type: 'fighting',
+    team: [
+      { name: 'hitmontop', level: 42, move1: 'rolling-kick', move2: 'quick-attack' },
+      { name: 'hitmonlee', level: 42, move1: 'jump-kick', move2: 'rolling-kick' },
+      { name: 'hitmonchan', level: 42, move1: 'ice-punch', move2: 'fire-punch' },
+      { name: 'machamp', level: 44, move1: 'cross-chop', move2: 'rock-slide' },
+      { name: 'machamp', level: 46, move1: 'submission', move2: 'strength' }
+    ],
+    moneyReward: 7000
+  },
+  {
+    name: 'Карен', title: 'Элитная Четверка Джото — Тьма', type: 'dark',
+    team: [
+      { name: 'umbreon', level: 42, move1: 'faint-attack', move2: 'confuse-ray' },
+      { name: 'vileplume', level: 42, move1: 'petal-dance', move2: 'acid' },
+      { name: 'murkrow', level: 44, move1: 'shadow-ball', move2: 'drill-peck' },
+      { name: 'gengar', level: 45, move1: 'shadow-ball', move2: 'destiny-bond' },
+      { name: 'houndoom', level: 47, move1: 'crunch', move2: 'flamethrower' }
+    ],
+    moneyReward: 8000
+  }
+];
+
+const johtoChampion = {
+  name: 'Лэнс (Чемпион Джото)', title: 'Чемпион Лиги Джото', type: 'dragon',
+  team: [
+    { name: 'gyarados', level: 44, move1: 'hydro-pump', move2: 'dragon-rage' },
+    { name: 'dragonite', level: 47, move1: 'hyper-beam', move2: 'dragon-rage' },
+    { name: 'charizard', level: 46, move1: 'flamethrower', move2: 'fly' },
+    { name: 'aerodactyl', level: 46, move1: 'hyper-beam', move2: 'fly' },
+    { name: 'dragonite', level: 49, move1: 'hyper-beam', move2: 'outrage' },
+    { name: 'dragonite', level: 50, move1: 'hyper-beam', move2: 'thunder' }
   ],
   moneyReward: 10000
 };
@@ -1951,7 +2083,7 @@ function collectDaycareEgg() {
   // Give egg as item
   daycareEgg = null;
   addItem('suspiciousEgg');
-  showToast('Вы получили яйцо! Оно добавлено в инвентарь.', true);
+  showToast('Вы получили яйцо! Оно добавлено в инвентарь.', false);
   autoSave();
 }
 
@@ -2511,7 +2643,7 @@ function openNPCDialog(npcId) {
         mon.statStages = { atk: 0, def: 0, spa: 0, spd: 0, spe: 0 };
         if (mon.movesPP) mon.movesPP.forEach(pp => { if (pp) pp.current = pp.max; });
       });
-      showToast('Ваша команда полностью вылечена!', true);
+      showToast('Ваша команда полностью вылечена!', false);
       modal.style.display = 'none';
       autoSave();
     };
@@ -3095,7 +3227,7 @@ function claimQuestReward(questId) {
   updateMoneyDisplay();
   updateInventoryDisplay();
   autoSave();
-  showToast(`Награда получена: ¥${q.rewardMoney}${q.rewardItem ? ` + ${q.rewardQty}x ${q.rewardItem}` : ''}!`, true);
+  showToast(`Награда получена: ¥${q.rewardMoney}${q.rewardItem ? ` + ${q.rewardQty}x ${q.rewardItem}` : ''}!`, false);
   renderQuests();
 }
 
@@ -6308,7 +6440,7 @@ function useItem(itemId) {
     // EXP Share - toggle distribution
     case 'expShare': {
       expShareActive = !expShareActive;
-      showToast(expShareActive ? 'Распределитель опыта активирован! Команда будет получать 50% опыта.' : 'Распределитель опыта деактивирован.', true);
+      showToast(expShareActive ? 'Распределитель опыта активирован! Команда будет получать 50% опыта.' : 'Распределитель опыта деактивирован.', false);
       break;
     }
     // Lucky Egg - give to selected pokemon as held item
@@ -6378,7 +6510,7 @@ function useItem(itemId) {
       mon.evs[evKey] = Math.min(252, mon.evs[evKey] + 10);
       removeItem(itemId);
       if (currentPokemonIndex !== null) refreshProfileUI();
-      showToast(`EV ${evKey.toUpperCase()} +10 (теперь ${mon.evs[evKey]})`, true);
+      showToast(`EV ${evKey.toUpperCase()} +10 (теперь ${mon.evs[evKey]})`, false);
       break;
     }
     default: {
@@ -7349,6 +7481,7 @@ async function loadChatMessages() {
 function renderChatMessage(msg, container) {
   const div = document.createElement('div');
   div.className = 'chat-msg';
+  div.setAttribute('data-msg-id', msg.id);
   const name = msg.first_name || msg.username || `Trainer#${msg.user_id}`;
   const time = msg.created_at ? msg.created_at.slice(11, 16) : '';
   div.innerHTML = `<span class="chat-msg-username" data-user-id="${msg.user_id}">${escapeHtml(name)}:</span><span class="chat-msg-text">${escapeHtml(msg.text)}</span><span class="chat-msg-time">${time}</span>`;
@@ -7367,7 +7500,23 @@ function escapeHtml(str) {
 
 function startChatPolling() {
   stopChatPolling();
-  chatPollingInterval = setInterval(loadChatMessages, 3000);
+  chatPollingInterval = setInterval(loadChatMessages, 30000); // fallback poll every 30s
+}
+
+// Listen for real-time chat messages via socket
+function initChatSocket() {
+  if (!socket) return;
+  socket.off('chat_message');
+  socket.on('chat_message', (msg) => {
+    const container = document.getElementById('chat-messages');
+    if (!container) return;
+    // Avoid duplicates if we also poll
+    const existing = container.querySelector(`[data-msg-id="${msg.id}"]`);
+    if (existing) return;
+    renderChatMessage(msg, container);
+    container.scrollTop = container.scrollHeight;
+    chatLastTimestamp = msg.created_at;
+  });
 }
 
 function stopChatPolling() {
@@ -7492,6 +7641,24 @@ async function loadLocationTrainers() {
   } catch (e) {
     listEl.innerHTML = '<div style="color:#4a6a7a;">Ошибка загрузки</div>';
   }
+}
+
+function updateTrainerLocationList(data) {
+  const listEl = document.getElementById('trainer-location-list');
+  if (!listEl || !data) return;
+  // Remove empty-state message if present
+  const emptyMsg = listEl.querySelector('.trainer-location-trainer[style]');
+  if (emptyMsg) emptyMsg.remove();
+  // Avoid duplicates
+  const existing = listEl.querySelector(`[data-trainer-id="${data.userId}"]`);
+  if (existing) return;
+  const div = document.createElement('div');
+  div.className = 'trainer-location-trainer';
+  div.setAttribute('data-trainer-id', data.userId);
+  const name = data.firstName || data.username || `Trainer#${data.userId}`;
+  div.innerText = name;
+  div.addEventListener('click', () => openTrainerProfile(data.userId));
+  listEl.appendChild(div);
 }
 
 async function openTrainerProfile(userId) {
@@ -7721,6 +7888,14 @@ function initTradeSocket() {
 
   socket.on('connect', () => {
     socket.emit('join_lobby', { username: tgUser?.first_name || tgUser?.username || 'Тренер', userId: tgUser?.id });
+    initChatSocket();
+  });
+
+  // Real-time location updates for trainer list
+  socket.on('location_update', (data) => {
+    if (data.locationId === currentLocationId && data.userId !== (tgUser?.id || 0)) {
+      updateTrainerLocationList(data);
+    }
   });
 
   socket.on('online_players', (players) => {

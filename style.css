@@ -1776,13 +1776,13 @@ input[type="number"] {
 
 /* --- DARK THEME QUESTS --- */
 [data-theme="dark"] .quest-container {
-  background: #2c2c2e;
-  color: #e0e0e0;
+  background: var(--tma-card-bg);
+  color: var(--tma-text);
 }
 [data-theme="dark"] .quest-card {
-  background: #3a3a3c;
-  border-color: #4a4a4c;
-  color: #e0e0e0;
+  background: var(--tma-bg);
+  border-color: var(--tma-border);
+  color: var(--tma-text);
 }
 
 /* NPC Modal */

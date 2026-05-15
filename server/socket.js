@@ -4,6 +4,8 @@ let io;
 const onlinePlayers = new Map(); // socket.id -> { username, userId }
 const activeTrades = new Map();  // tradeId -> { p1: socketId, p2: socketId, p1Offer: null, p2Offer: null, p1Confirm: false, p2Confirm: false }
 
+export function getIO() { return io; }
+
 export function initSocket(server, allowedOrigin) {
   io = new Server(server, {
     cors: {

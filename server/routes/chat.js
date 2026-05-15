@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { authMiddleware } from '../middleware/auth.js';
 import { getDB } from '../db.js';
+import { getIO } from '../socket.js';
 
 const router = Router();
 
@@ -23,13 +24,25 @@ router.post('/send', authMiddleware, async (req, res) => {
       return res.status(404).json({ error: 'User not found' });
     }
 
-    await db.run(
+    const result = await db.run(
       `INSERT INTO chat_messages (user_id, username, first_name, text) VALUES (?, ?, ?, ?)`,
       req.userId,
       user.username || '',
       user.first_name || '',
       text.trim()
     );
+
+    // Broadcast to all connected clients via Socket.IO
+    const msg = {
+      id: result.lastID,
+      user_id: req.userId,
+      username: user.username || '',
+      first_name: user.first_name || '',
+      text: text.trim(),
+      created_at: new Date().toISOString()
+    };
+    const io = getIO();
+    if (io) io.emit('chat_message', msg);
 
     res.json({ success: true });
   } catch (err) {

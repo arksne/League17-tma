@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { authMiddleware } from '../middleware/auth.js';
 import { getDB } from '../db.js';
+import { getIO } from '../socket.js';
 
 const router = Router();
 
@@ -21,6 +22,19 @@ router.post('/location', authMiddleware, async (req, res) => {
       req.userId,
       locationId
     );
+    // Broadcast location change via socket for real-time trainer list updates
+    const io = getIO();
+    if (io) {
+      const user = await db.get('SELECT username, first_name FROM users WHERE id = ?', req.userId);
+      io.emit('location_update', {
+        userId: req.userId,
+        username: user?.username || '',
+        firstName: user?.first_name || '',
+        locationId,
+        timestamp: new Date().toISOString()
+      });
+    }
+
     res.json({ success: true });
   } catch (err) {
     console.error('Location update error:', err);

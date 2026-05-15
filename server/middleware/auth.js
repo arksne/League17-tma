@@ -1,6 +1,6 @@
 import jwt from 'jsonwebtoken';
 
-const JWT_SECRET = process.env.JWT_SECRET || 'league17-dev-secret-2026';
+const JWT_SECRET = process.env.JWT_SECRET || (console.warn('WARNING: JWT_SECRET not set, using insecure default!'), 'league17-dev-secret-2026');
 
 export function authMiddleware(req, res, next) {
   const header = req.headers.authorization;
