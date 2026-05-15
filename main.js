@@ -7254,14 +7254,15 @@ async function showRegistrationScreen(tgData) {
           <input id="reg-nickname" type="text" value="${tgData.first_name || tgData.username || ''}" maxlength="20" style="width:100%;padding:10px;margin:4px 0 12px;border:1px solid var(--tma-border);border-radius:8px;background:var(--tma-card-bg);color:var(--tma-text);font-size:1rem;">
 
           <label style="font-size:0.8rem;color:var(--tma-text-muted);">Аватар</label>
+          <div style="display:flex;align-items:center;gap:8px;margin:4px 0 8px;">
+            <div id="reg-avatar-preview" style="width:56px;height:56px;border-radius:50%;background:var(--tma-card-bg);display:flex;align-items:center;justify-content:center;font-size:2rem;border:2px solid var(--tma-primary);flex-shrink:0;">👤</div>
+            <input type="file" id="reg-avatar-file" accept="image/*" style="display:none;">
+            <button class="tma-btn" id="reg-avatar-camera" style="padding:8px 12px;font-size:0.8rem;background:var(--tma-card-bg);">📷 Фото</button>
+          </div>
           <div id="reg-avatars" style="display:flex;flex-wrap:wrap;gap:6px;margin:4px 0 12px;">
             ${['👤','🧑','👨‍🔬','🎩','🧢','🎓','👑','🤠','🦸','🧙','😎','🤖','👻','🐱','🐶'].map(a => `<span class="reg-avatar-opt" data-av="${a}" style="font-size:1.8rem;cursor:pointer;padding:4px;border-radius:8px;border:2px solid transparent;">${a}</span>`).join('')}
           </div>
 
-          <label style="font-size:0.8rem;color:var(--tma-text-muted);">Стартовый покемон</label>
-          <div id="reg-starters" style="display:flex;gap:8px;margin:4px 0 12px;">
-            ${['bulbasaur','charmander','squirtle','pikachu'].map(s => `<div class="reg-starter-opt" data-starter="${s}" style="flex:1;text-align:center;cursor:pointer;padding:8px;border-radius:8px;border:2px solid var(--tma-border);text-transform:capitalize;font-size:0.75rem;">${s}</div>`).join('')}
-          </div>
         </div>
 
         <button class="tma-btn" id="btn-register" style="width:100%;padding:12px;background:#34c759;font-size:1rem;">🎮 Начать приключение!</button>
@@ -7271,7 +7272,24 @@ async function showRegistrationScreen(tgData) {
     document.body.appendChild(overlay);
 
     let selectedAvatar = '👤';
-    let selectedStarter = 'bulbasaur';
+    let customAvatarData = null;
+
+    // Camera/gallery upload
+    document.getElementById('reg-avatar-camera').addEventListener('click', () => {
+      document.getElementById('reg-avatar-file').click();
+    });
+    document.getElementById('reg-avatar-file').addEventListener('change', (e) => {
+      const file = e.target.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = (ev) => {
+        customAvatarData = ev.target.result;
+        document.getElementById('reg-avatar-preview').innerHTML = `<img src="${customAvatarData}" style="width:100%;height:100%;border-radius:50%;object-fit:cover;">`;
+        selectedAvatar = '__custom__';
+        overlay.querySelectorAll('.reg-avatar-opt').forEach(el => el.style.borderColor = 'transparent');
+      };
+      reader.readAsDataURL(file);
+    });
 
     overlay.querySelectorAll('.reg-avatar-opt').forEach(el => {
       el.addEventListener('click', () => {
@@ -7281,23 +7299,29 @@ async function showRegistrationScreen(tgData) {
       });
     });
 
-    overlay.querySelectorAll('.reg-starter-opt').forEach(el => {
-      el.addEventListener('click', () => {
-        overlay.querySelectorAll('.reg-starter-opt').forEach(e => e.style.borderColor = 'var(--tma-border)');
-        el.style.borderColor = 'var(--tma-primary)';
-        selectedStarter = el.getAttribute('data-starter');
-      });
-    });
-
     document.getElementById('btn-register').addEventListener('click', async () => {
       const nickname = document.getElementById('reg-nickname').value.trim();
       if (!nickname) { document.getElementById('reg-error').style.display = 'block'; document.getElementById('reg-error').textContent = 'Введи прозвище!'; return; }
 
       try {
+        // Upload custom avatar first if selected
+        let finalAvatar = selectedAvatar;
+        if (customAvatarData) {
+          const upRes = await fetch('/api/auth/avatar', {
+            method: 'POST',
+            headers: { ...getCloudAuthHeaders(), 'Content-Type': 'application/json' },
+            body: JSON.stringify({ image: customAvatarData })
+          });
+          if (upRes.ok) {
+            const upData = await upRes.json();
+            finalAvatar = upData.avatarUrl;
+          }
+        }
+
         await fetch('/api/auth/register', {
           method: 'POST',
           headers: { ...getCloudAuthHeaders(), 'Content-Type': 'application/json' },
-          body: JSON.stringify({ nickname, avatar: selectedAvatar, starterPokemon: selectedStarter })
+          body: JSON.stringify({ nickname, avatar: finalAvatar })
         });
         trainerNickname = nickname;
         localStorage.setItem(lsKey('avatar'), selectedAvatar);
@@ -8226,11 +8250,16 @@ async function loadAllTrainers() {
     trainersAllData.forEach(u => {
       const card = document.createElement('div');
       card.className = 'trainer-list-card';
+      const avatarHtml = (u.avatar && u.avatar.startsWith('/avatars/'))
+        ? `<img src="${u.avatar}" style="width:100%;height:100%;border-radius:50%;object-fit:cover;">`
+        : `<span style="font-size:1.5rem;">${u.avatar || '👤'}</span>`;
+      const lastSeen = u.lastSeen ? u.lastSeen.slice(0,16).replace('T',' ') : u.created_at?.slice(0,10) || '';
       card.innerHTML = `
-        <div class="trainer-list-avatar">${u.avatar || '👤'}</div>
+        <div class="trainer-list-avatar">${avatarHtml}</div>
         <div class="trainer-list-info">
-          <div class="trainer-list-name">${u.first_name || u.username || 'Тренер'}</div>
-          <div class="trainer-list-id">ID: ${u.id} | ${u.created_at?.slice(0,10) || ''}</div>
+          <div class="trainer-list-name">${u.nickname || u.first_name || u.username || 'Тренер'} ${u.registered ? '✅' : '🆕'}</div>
+          <div class="trainer-list-id">🏅${u.badges||0} | 💰${u.money||0} | 🐾${u.teamSize||0}</div>
+          <div class="trainer-list-id">📍${u.region || '?'} | 🕐${lastSeen}</div>
         </div>`;
       card.addEventListener('click', () => openTrainerProfile(u.id));
       listEl.appendChild(card);

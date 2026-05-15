@@ -55,6 +55,8 @@ const __dirname = path.dirname(__filename);
 
 // Serve static files from the Vite build output directory
 app.use(express.static(path.join(__dirname, '../dist')));
+// Serve uploaded avatars
+app.use('/avatars', express.static(path.join(__dirname, '../public/avatars')));
 
 // SPA fallback for all other non-API routes
 app.use((req, res, next) => {

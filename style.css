@@ -140,6 +140,29 @@ body {
   font-size: 1.4rem;
   margin-bottom: 2px;
 }
+/* Pokeball nav icons */
+.pokeball-icon {
+  width: 26px; height: 26px;
+  border-radius: 50%;
+  background: linear-gradient(180deg, #e84040 0%, #e84040 48%, #333 48%, #333 55%, #fff 55%, #fff 100%);
+  border: 2px solid #333;
+  position: relative;
+}
+.pokeball-icon::after {
+  content: '';
+  position: absolute;
+  width: 8px; height: 8px;
+  border-radius: 50%;
+  background: #fff;
+  border: 2px solid #333;
+  top: 50%; left: 50%;
+  transform: translate(-50%, -50%);
+}
+.pokeball-icon.world { background: linear-gradient(180deg, #5ba0e8 0%, #5ba0e8 48%, #1a3a5c 48%, #1a3a5c 55%, #fff 55%, #fff 100%); }
+.pokeball-icon.backpack { background: linear-gradient(180deg, #ff9500 0%, #ff9500 48%, #1a3a5c 48%, #1a3a5c 55%, #fff 55%, #fff 100%); }
+.pokeball-icon.team { background: linear-gradient(180deg, #e84040 0%, #e84040 48%, #1a3a5c 48%, #1a3a5c 55%, #fff 55%, #fff 100%); }
+.pokeball-icon.chat { background: linear-gradient(180deg, #34c759 0%, #34c759 48%, #1a3a5c 48%, #1a3a5c 55%, #fff 55%, #fff 100%); }
+.pokeball-icon.trainers { background: linear-gradient(180deg, #af52de 0%, #af52de 48%, #1a3a5c 48%, #1a3a5c 55%, #fff 55%, #fff 100%); }
 
 .nav-item span {
   font-size: 0.75rem;
