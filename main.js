@@ -2061,11 +2061,11 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
   }
 
-  // Safety: if no pokemon after load, give starter
-  if (!myTeam || myTeam.length === 0 || !myTeam.some(m => m && m.apiData)) {
-    console.warn('No valid pokemon in team, giving starter');
+  // CRITICAL: if no valid pokemon, force give starter
+  if (!myTeam || myTeam.length === 0 || myTeam.every(m => !m || !m.apiData || !m.currentHp)) {
     myTeam = [];
     await giveStarter();
+    saveGame();
   }
 
   renderLocation(currentLocationId);
@@ -7433,10 +7433,10 @@ async function authTelegram() {
 
     hideLoginScreen();
 
-    // Check if registration needed — wait for it
-    if (!data.user.registered) {
+    // Registration: skip if user already has data (localStorage or server save)
+    const hasLocalData = localStorage.getItem(lsKey('save'));
+    if (!data.user.registered && !hasLocalData) {
       await showRegistrationScreen(data.user);
-      // Reload user data after registration
       tgUser.registered = 1;
     }
   } catch (e) {
