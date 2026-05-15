@@ -9,7 +9,7 @@ const REGIONS = {
       },
       'route_1': {
         name: 'Маршрут 1', desc: 'Короткая тропа между Алабастией и Виридианом.',
-        image: 'https://archives.bulbagarden.net/media/upload/thumb/b/b3/Kanto_Route_1_FRLG.png/250px-Kanto_Route_1_FRLG.png',
+        image: 'wiki_images/generic_route.png',
         links: ['pallet_town', 'viridian_city'], encounters: ['pidgey', 'rattata'], hasHeal: false, region: 'kanto'
       },
       'viridian_city': {
@@ -18,7 +18,7 @@ const REGIONS = {
       },
       'route_22': {
         name: 'Маршрут 22', desc: 'Дорога к Лиге Покемонов.',
-        image: 'https://archives.bulbagarden.net/media/upload/thumb/e/ef/Kanto_Route_22_FRLG.png/250px-Kanto_Route_22_FRLG.png',
+        image: 'wiki_images/generic_route.png',
         links: ['viridian_city', 'victory_road'], encounters: ['mankey', 'spearow'], hasHeal: false, region: 'kanto'
       },
       'route_2': {
@@ -35,17 +35,17 @@ const REGIONS = {
       },
       'route_3': {
         name: 'Маршрут 3', desc: 'Холмистая дорога к Лунной Горе.',
-        image: 'https://archives.bulbagarden.net/media/upload/thumb/0/02/Kanto_Route_3_FRLG.png/300px-Kanto_Route_3_FRLG.png',
+        image: 'wiki_images/generic_route.png',
         links: ['pewter_city', 'mt_moon'], encounters: ['spearow', 'jigglypuff', 'nidoran-f', 'nidoran-m'], hasHeal: false, region: 'kanto'
       },
       'mt_moon': {
         name: 'Лунная Гора (Mt. Moon)', desc: 'Огромная пещера, где падают метеориты.',
-        image: 'https://archives.bulbagarden.net/media/upload/thumb/d/d4/Mt_Moon_1F_FRLG.png/300px-Mt_Moon_1F_FRLG.png',
+        image: 'wiki_images/generic_route.png',
         links: ['route_3', 'route_4'], encounters: ['zubat', 'geodude', 'paras', 'clefairy'], hasHeal: false, region: 'kanto'
       },
       'route_4': {
         name: 'Маршрут 4', desc: 'Короткий спуск к Церулину.',
-        image: 'https://archives.bulbagarden.net/media/upload/thumb/d/d8/Kanto_Route_4_FRLG.png/300px-Kanto_Route_4_FRLG.png',
+        image: 'wiki_images/generic_route.png',
         links: ['mt_moon', 'cerulean_city'], encounters: ['rattata', 'spearow', 'ekans', 'sandshrew'], hasHeal: false, region: 'kanto'
       },
       'cerulean_city': {
@@ -54,17 +54,17 @@ const REGIONS = {
       },
       'route_24': {
         name: 'Маршрут 24 (Мост)', desc: 'Мост самородков.',
-        image: 'https://archives.bulbagarden.net/media/upload/thumb/f/f3/Kanto_Route_24_FRLG.png/250px-Kanto_Route_24_FRLG.png',
+        image: 'wiki_images/generic_route.png',
         links: ['cerulean_city', 'route_25'], encounters: ['weedle', 'caterpie', 'abra', 'bellsprout'], hasHeal: false, region: 'kanto'
       },
       'route_25': {
         name: 'Маршрут 25', desc: 'Дом Билла.',
-        image: 'https://archives.bulbagarden.net/media/upload/thumb/5/5e/Kanto_Route_25_FRLG.png/250px-Kanto_Route_25_FRLG.png',
+        image: 'wiki_images/generic_route.png',
         links: ['route_24'], encounters: ['pidgey', 'oddish', 'venonat'], hasHeal: false, region: 'kanto'
       },
       'route_5': {
         name: 'Маршрут 5', desc: 'Спуск к Шаффрану.',
-        image: 'https://archives.bulbagarden.net/media/upload/thumb/5/5d/Kanto_Route_5_FRLG.png/250px-Kanto_Route_5_FRLG.png',
+        image: 'wiki_images/generic_route.png',
         links: ['cerulean_city', 'saffron'], encounters: ['meowth', 'mankey', 'pidgey'], hasHeal: false, region: 'kanto'
       },
       'saffron': {
@@ -73,7 +73,7 @@ const REGIONS = {
       },
       'route_6': {
         name: 'Маршрут 6', desc: 'Короткий маршрут, соединяющий Вермилион и Шаффран.',
-        image: 'https://archives.bulbagarden.net/media/upload/thumb/c/cd/Kanto_Route_6_FRLG.png/250px-Kanto_Route_6_FRLG.png',
+        image: 'wiki_images/generic_route.png',
         links: ['saffron', 'vermilion'], encounters: ['pidgey', 'rattata', 'meowth', 'psyduck', 'oddish'], hasHeal: false, hasWater: true, region: 'kanto'
       },
       'vermilion': {
@@ -82,7 +82,7 @@ const REGIONS = {
       },
       'route_11': {
         name: 'Маршрут 11', desc: 'Дорога на восток от Вермилиона.',
-        image: 'https://archives.bulbagarden.net/media/upload/thumb/4/4e/Kanto_Route_11_FRLG.png/300px-Kanto_Route_11_FRLG.png',
+        image: 'wiki_images/generic_route.png',
         links: ['vermilion', 'diglett_cave', 'route_12'], encounters: ['spearow', 'ekans', 'sandshrew', 'drowzee'], hasHeal: false, hasWater: true, region: 'kanto'
       },
       'diglett_cave': {
@@ -91,17 +91,17 @@ const REGIONS = {
       },
       'route_9': {
         name: 'Маршрут 9', desc: 'Скалистая дорога от Церулина к Каменному Тоннелю.',
-        image: 'https://archives.bulbagarden.net/media/upload/thumb/6/6f/Kanto_Route_9_FRLG.png/300px-Kanto_Route_9_FRLG.png',
+        image: 'wiki_images/generic_route.png',
         links: ['cerulean_city', 'route_10'], encounters: ['rattata', 'spearow', 'ekans', 'sandshrew'], hasHeal: false, region: 'kanto'
       },
       'route_10': {
         name: 'Маршрут 10', desc: 'Река перед Каменным Тоннелем.',
-        image: 'https://archives.bulbagarden.net/media/upload/thumb/d/d4/Kanto_Route_10_FRLG.png/150px-Kanto_Route_10_FRLG.png',
+        image: 'wiki_images/generic_route.png',
         links: ['route_9', 'rock_tunnel', 'lavender_town'], encounters: ['voltorb', 'magnemite', 'machop'], hasHeal: false, hasWater: true, region: 'kanto'
       },
       'rock_tunnel': {
         name: 'Каменный Тоннель', desc: 'Темная и длинная пещера.',
-        image: 'https://archives.bulbagarden.net/media/upload/thumb/e/e0/Rock_Tunnel_1F_FRLG.png/300px-Rock_Tunnel_1F_FRLG.png',
+        image: 'wiki_images/generic_route.png',
         links: ['route_10'], encounters: ['zubat', 'geodude', 'machop', 'onix'], hasHeal: false, region: 'kanto'
       },
       'lavender_town': {
@@ -110,12 +110,12 @@ const REGIONS = {
       },
       'route_8': {
         name: 'Маршрут 8', desc: 'Дорога в Шаффран.',
-        image: 'https://archives.bulbagarden.net/media/upload/thumb/8/87/Kanto_Route_8_FRLG.png/300px-Kanto_Route_8_FRLG.png',
+        image: 'wiki_images/generic_route.png',
         links: ['lavender_town', 'saffron'], encounters: ['pidgey', 'meowth', 'growlithe', 'vulpix'], hasHeal: false, region: 'kanto'
       },
       'route_7': {
         name: 'Маршрут 7', desc: 'Короткий путь из Селадона в Шаффран.',
-        image: 'https://archives.bulbagarden.net/media/upload/thumb/0/07/Kanto_Route_7_FRLG.png/150px-Kanto_Route_7_FRLG.png',
+        image: 'wiki_images/generic_route.png',
         links: ['celadon_city', 'saffron'], encounters: ['meowth', 'oddish', 'bellsprout'], hasHeal: false, region: 'kanto'
       },
       'celadon_city': {
@@ -124,17 +124,17 @@ const REGIONS = {
       },
       'route_16': {
         name: 'Маршрут 16', desc: 'Выезд на велосипедную дорожку.',
-        image: 'https://archives.bulbagarden.net/media/upload/thumb/6/69/Kanto_Route_16_FRLG.png/250px-Kanto_Route_16_FRLG.png',
+        image: 'wiki_images/generic_route.png',
         links: ['celadon_city', 'route_17'], encounters: ['spearow', 'doduo', 'rattata', 'grimer'], hasHeal: false, region: 'kanto'
       },
       'route_17': {
         name: 'Велосипедная дорожка (М17)', desc: 'Длинный мост байкеров.',
-        image: 'https://archives.bulbagarden.net/media/upload/thumb/0/01/Kanto_Route_17_FRLG.png/150px-Kanto_Route_17_FRLG.png',
+        image: 'wiki_images/generic_route.png',
         links: ['route_16', 'route_18'], encounters: ['doduo', 'fearow', 'grimer', 'ponyta'], hasHeal: false, region: 'kanto'
       },
       'route_18': {
         name: 'Маршрут 18', desc: 'Конец дорожки у Фуксии.',
-        image: 'https://archives.bulbagarden.net/media/upload/thumb/5/5f/Kanto_Route_18_FRLG.png/250px-Kanto_Route_18_FRLG.png',
+        image: 'wiki_images/generic_route.png',
         links: ['route_17', 'fuchsia_city'], encounters: ['doduo', 'fearow', 'rattata'], hasHeal: false, region: 'kanto'
       },
       'fuchsia_city': {
@@ -143,42 +143,42 @@ const REGIONS = {
       },
       'safari_zone': {
         name: 'Сафари Зона', desc: 'Огромный заповедник редких покемонов.',
-        image: 'https://archives.bulbagarden.net/media/upload/thumb/6/6f/Safari_Zone_Center_FRLG.png/300px-Safari_Zone_Center_FRLG.png',
+        image: 'wiki_images/generic_route.png',
         links: ['fuchsia_city'], encounters: ['nidoran-f', 'nidoran-m', 'exeggcute', 'rhyhorn', 'chansey', 'scyther', 'pinsir', 'tauros'], hasHeal: false, region: 'kanto'
       },
       'route_15': {
         name: 'Маршрут 15', desc: 'Дорога на восток от Фуксии.',
-        image: 'https://archives.bulbagarden.net/media/upload/thumb/9/91/Kanto_Route_15_FRLG.png/300px-Kanto_Route_15_FRLG.png',
+        image: 'wiki_images/generic_route.png',
         links: ['fuchsia_city', 'route_14'], encounters: ['oddish', 'bellsprout', 'venonat', 'ditto'], hasHeal: false, region: 'kanto'
       },
       'route_14': {
         name: 'Маршрут 14', desc: 'Поворот на север.',
-        image: 'https://archives.bulbagarden.net/media/upload/thumb/e/e0/Kanto_Route_14_FRLG.png/150px-Kanto_Route_14_FRLG.png',
+        image: 'wiki_images/generic_route.png',
         links: ['route_15', 'route_13'], encounters: ['pidgey', 'pidgeotto', 'ditto'], hasHeal: false, hasWater: true, region: 'kanto'
       },
       'route_13': {
         name: 'Маршрут 13', desc: 'Деревянный мост-лабиринт.',
-        image: 'https://archives.bulbagarden.net/media/upload/thumb/c/ca/Kanto_Route_13_FRLG.png/300px-Kanto_Route_13_FRLG.png',
+        image: 'wiki_images/generic_route.png',
         links: ['route_14', 'route_12'], encounters: ['pidgey', 'oddish', 'bellsprout', 'venonat'], hasHeal: false, hasWater: true, region: 'kanto'
       },
       'route_12': {
         name: 'Маршрут 12', desc: 'Мост рыбаков. Здесь спал Снорлакс.',
-        image: 'https://archives.bulbagarden.net/media/upload/thumb/5/52/Kanto_Route_12_FRLG.png/150px-Kanto_Route_12_FRLG.png',
+        image: 'wiki_images/generic_route.png',
         links: ['route_13', 'lavender_town', 'route_11'], encounters: ['tentacool', 'magikarp', 'snorlax'], hasHeal: false, hasWater: true, region: 'kanto'
       },
       'route_19': {
         name: 'Маршрут 19', desc: 'Морской путь от Фуксии.',
-        image: 'https://archives.bulbagarden.net/media/upload/thumb/f/f2/Kanto_Route_19_FRLG.png/200px-Kanto_Route_19_FRLG.png',
+        image: 'wiki_images/generic_route.png',
         links: ['fuchsia_city', 'route_20'], encounters: ['tentacool', 'magikarp'], hasHeal: false, hasWater: true, region: 'kanto'
       },
       'route_20': {
         name: 'Маршрут 20', desc: 'Бурные воды у Островов Морской Пены.',
-        image: 'https://archives.bulbagarden.net/media/upload/thumb/7/75/Kanto_Route_20_FRLG.png/300px-Kanto_Route_20_FRLG.png',
+        image: 'wiki_images/generic_route.png',
         links: ['route_19', 'seafoam_islands', 'cinnabar_island'], encounters: ['tentacool', 'magikarp', 'lapras'], hasHeal: false, hasWater: true, region: 'kanto'
       },
       'seafoam_islands': {
         name: 'Острова Морской Пены', desc: 'Ледяные пещеры, обитель Артикуно.',
-        image: 'https://archives.bulbagarden.net/media/upload/thumb/8/87/Seafoam_Islands_1F_FRLG.png/300px-Seafoam_Islands_1F_FRLG.png',
+        image: 'wiki_images/generic_route.png',
         links: ['route_20'], encounters: ['seel', 'slowpoke', 'zubat', 'golbat', 'jynx', 'articuno'], hasHeal: false, hasWater: true, region: 'kanto'
       },
       'cinnabar_island': {
@@ -187,22 +187,22 @@ const REGIONS = {
       },
       'route_21': {
         name: 'Маршрут 21', desc: 'Водный путь прямо до Алабастии.',
-        image: 'https://archives.bulbagarden.net/media/upload/thumb/0/01/Kanto_Route_21_FRLG.png/150px-Kanto_Route_21_FRLG.png',
+        image: 'wiki_images/generic_route.png',
         links: ['cinnabar_island', 'pallet_town'], encounters: ['tentacool', 'tangela'], hasHeal: false, hasWater: true, region: 'kanto'
       },
       'victory_road': {
         name: 'Дорога Победы', desc: 'Последнее испытание перед Лигой.',
-        image: 'https://archives.bulbagarden.net/media/upload/thumb/2/23/Victory_Road_1F_FRLG.png/300px-Victory_Road_1F_FRLG.png',
+        image: 'wiki_images/generic_route.png',
         links: ['route_22', 'indigo_plateau'], encounters: ['machop', 'geodude', 'zubat', 'onix'], hasHeal: false, region: 'kanto'
       },
       'indigo_plateau': {
         name: 'Плато Индиго', desc: 'Конец пути. Здесь заседает Элитная Четверка.',
-        image: 'https://archives.bulbagarden.net/media/upload/thumb/7/7b/Indigo_Plateau_FRLG.png/300px-Indigo_Plateau_FRLG.png',
+        image: 'wiki_images/generic_route.png',
         links: ['victory_road'], encounters: [], hasHeal: true, region: 'kanto'
       },
       'pokecenter': {
         name: 'Покецентр', desc: 'Центр помощи покемонам. Сестра Джой и Питомник.',
-        image: 'https://archives.bulbagarden.net/media/upload/thumb/4/49/Pok%C3%A9mon_Center_interior_FRLG.png/300px-Pok%C3%A9mon_Center_interior_FRLG.png',
+        image: 'wiki_images/generic_route.png',
         links: [], encounters: [], hasHeal: false, region: 'kanto'
       }
     }
@@ -2303,6 +2303,17 @@ async function giveStarterMon(pokemonName) {
     const res = await fetch(`https://pokeapi.co/api/v2/pokemon/${pokemonName}`);
     const starterData = await res.json();
     const baseLevel = 5;
+    
+    // Filter moves to only those learned at level <= 5
+    let learnedMoves = starterData.moves.filter(m => {
+      return m.version_group_details.some(v => v.move_learn_method.name === 'level-up' && v.level_learned_at <= baseLevel);
+    }).slice(0, 4);
+    
+    if (learnedMoves.length === 0) {
+      learnedMoves.push({ move: { name: 'tackle', url: 'https://pokeapi.co/api/v2/move/33/' } });
+    }
+    starterData.moves = learnedMoves;
+
     const exp = Math.pow(baseLevel, 3);
     const expToNext = Math.pow(baseLevel + 1, 3);
 
@@ -3701,7 +3712,7 @@ async function useMove(moveIndex) {
       appendToLog('Штурмовой жилет не позволяет использовать статус-атаки!');
       return;
     }
-    // Status move - try apply status effect from move
+    // Status move - try apply status effect or stat change
     const ailment = move.meta?.ailment?.name;
     if (ailment && ailment !== 'none' && ailment !== 'unknown') {
       const statusMap = {
@@ -3718,7 +3729,27 @@ async function useMove(moveIndex) {
         }
       }
     }
-    if (!power) {
+
+    let appliedStat = false;
+    if (move.stat_changes && move.stat_changes.length > 0) {
+      const targetMap = { 'user': activePlayerMon, 'selected-pokemon': activeWild, 'all-opponents': activeWild };
+      const moveTarget = move.target?.name || 'selected-pokemon';
+      const affectedMon = targetMap[moveTarget] || activeWild;
+      const monName = affectedMon === activePlayerMon ? activePlayerMon.apiData.name : activeWild.name;
+      const statNameMap = { 'attack': 'atk', 'defense': 'def', 'special-attack': 'spa', 'special-defense': 'spd', 'speed': 'spe' };
+      
+      move.stat_changes.forEach(sc => {
+        const statKey = statNameMap[sc.stat.name];
+        if (statKey) {
+          statStageModify(affectedMon, statKey, sc.change);
+          const dir = sc.change > 0 ? 'повысилась' : 'понизилась';
+          appendToLog(`У ${monName} ${dir} ${sc.stat.name}!`, false, 'system');
+          appliedStat = true;
+        }
+      });
+    }
+
+    if (!appliedStat && (!ailment || ailment === 'none' || ailment === 'unknown')) {
       appendToLog('Но ничего не произошло...');
     }
   } else {
@@ -5881,6 +5912,23 @@ function renderInventory() {
 
   container.innerHTML = '';
 
+  // Show Money as an item
+  const moneyTitle = document.createElement('div');
+  moneyTitle.className = 'inv-category-title';
+  moneyTitle.textContent = 'Валюта';
+  container.appendChild(moneyTitle);
+  
+  const moneyGrid = document.createElement('div');
+  moneyGrid.className = 'inv-grid';
+  moneyGrid.innerHTML = `
+    <div class="inv-item" style="cursor: default;">
+      <div class="inv-item-icon" style="font-size:24px; color:#f0d060;">¥</div>
+      <div class="inv-item-name">Кредиты</div>
+      <div class="inv-item-qty">x${money}</div>
+    </div>
+  `;
+  container.appendChild(moneyGrid);
+
   // Group items by category
   const categories = {
     balls: 'Покеболы',
@@ -6506,26 +6554,13 @@ function initTelegram() {
 
 async function authTelegram() {
   initTelegram();
-  let initData = '';
-
-  if (window.Telegram && window.Telegram.WebApp && window.Telegram.WebApp.initData) {
-    initData = window.Telegram.WebApp.initData;
+  if (window.Telegram && window.Telegram.WebApp && window.Telegram.WebApp.initDataUnsafe && window.Telegram.WebApp.initDataUnsafe.user) {
+    tgUser = window.Telegram.WebApp.initDataUnsafe.user;
+    tgToken = "dummy_token";
   } else {
-    initData = 'test';
-  }
-
-  try {
-    const res = await fetch(`${API_BASE}/auth/tg`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ initData })
-    });
-    if (!res.ok) return;
-    const data = await res.json();
-    tgToken = data.token;
-    tgUser = data.user;
-  } catch (e) {
-    console.warn('Auth failed (offline?)', e);
+    // Fallback for browser testing
+    tgUser = { id: 1, first_name: "Trainer", username: "trainer123" };
+    tgToken = "test_token";
   }
 }
 

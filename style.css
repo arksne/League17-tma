@@ -946,6 +946,7 @@ input[type="number"] {
   gap: 12px;
   margin-top: 6px;
   font-size: 0.8rem;
+  flex-wrap: wrap;
 }
 
 .header-money {
