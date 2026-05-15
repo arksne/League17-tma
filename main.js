@@ -2525,23 +2525,96 @@ function craftItem(recipeId) {
   openCrafting();
 }
 
-function saveGame() {
-  const saveData = {
+// ═══════════════════════════════════════════
+// SAVE SYSTEM v2 — versioned, reliable, server-authoritative
+// ═══════════════════════════════════════════
+let saveVersion = 0;
+let lastCloudSync = 0;
+let saveRetryCount = 0;
+const MAX_RETRIES = 5;
+const RETRY_DELAYS = [2000, 4000, 8000, 16000, 32000];
+
+function getFullSaveData() {
+  return {
+    _v: saveVersion,
+    _ts: Date.now(),
     currentLocationId, currentRegion,
     inventory: { ...inventory },
     money, badges, trainerNickname,
-    myTeam,
+    myTeam: myTeam.map(m => ({
+      uid: m.uid, originalTrainer: m.originalTrainer, createdAt: m.createdAt,
+      caughtLocation: m.caughtLocation, previousOwner: m.previousOwner,
+      apiData: m.apiData, maxHp: m.maxHp, currentHp: m.currentHp,
+      ivs: m.ivs, evs: m.evs, baseLevel: m.baseLevel,
+      exp: m.exp, expToNext: m.expToNext, candiesEaten: m.candiesEaten,
+      vitaminsEaten: m.vitaminsEaten, training: m.training, trainingStage: m.trainingStage,
+      trainingStat: m.trainingStat, happiness: m.happiness, natureIdx: m.natureIdx,
+      breedLetter: m.breedLetter, status: m.status, sleepTurns: m.sleepTurns,
+      movesPP: m.movesPP, statStages: m.statStages, abilityName: m.abilityName,
+      heldItem: m.heldItem, berries: m.berries, learnableMoves: m.learnableMoves,
+      _learnableFetched: m._learnableFetched,
+    })),
     currentPokemonIndex,
     pokedexSeen: Array.from(pokedexSeen),
     pokedexCaught: Array.from(pokedexCaught),
     quests, questProgress, completedQuests, npcQuestProgress, completedNPCQuests,
     visitedLocations: Array.from(visitedLocations), itemsUsedInBattle, itemHistory,
-    pcBoxes, daycareMons, daycareEgg, lastLocation, expShareActive,
+    pcBoxes: pcBoxes.map(box => box.map(m => ({
+      uid: m.uid, originalTrainer: m.originalTrainer, createdAt: m.createdAt,
+      caughtLocation: m.caughtLocation, apiData: m.apiData, maxHp: m.maxHp,
+      currentHp: m.currentHp, ivs: m.ivs, evs: m.evs, baseLevel: m.baseLevel,
+      exp: m.exp, expToNext: m.expToNext, candiesEaten: m.candiesEaten,
+      vitaminsEaten: m.vitaminsEaten, trainingStage: m.trainingStage, trainingStat: m.trainingStat,
+      happiness: m.happiness, natureIdx: m.natureIdx, breedLetter: m.breedLetter,
+      status: m.status, sleepTurns: m.sleepTurns, movesPP: m.movesPP,
+      statStages: m.statStages, abilityName: m.abilityName, heldItem: m.heldItem,
+      berries: m.berries, learnableMoves: m.learnableMoves,
+    }))),
+    daycareMons, daycareEgg, lastLocation, expShareActive,
   };
+}
+
+function validateGameState() {
+  // Ensure critical structures exist
+  if (!myTeam) myTeam = [];
+  if (!pcBoxes) pcBoxes = [[]];
+  if (!badges) badges = [];
+  if (!inventory) inventory = {};
+  // Ensure all ITEMS exist in inventory
+  ITEMS.forEach(item => { if (!(item.id in inventory)) inventory[item.id] = 0; });
+  // Validate team pokemon have required fields
+  myTeam.forEach((m, i) => {
+    if (!m.uid) m.uid = generateUID();
+    if (!m.originalTrainer) m.originalTrainer = getTrainerId();
+    if (!m.createdAt) m.createdAt = Date.now();
+    if (!m.apiData) { console.warn('Pokemon without apiData at index', i, '— removing'); myTeam.splice(i, 1); return; }
+    if (!m.maxHp || m.maxHp <= 0) m.maxHp = 50;
+    if (m.currentHp === undefined || m.currentHp < 0) m.currentHp = m.maxHp;
+    if (!m.ivs) m.ivs = { hp: 15, atk: 15, def: 15, spa: 15, spd: 15, spe: 15 };
+    if (!m.evs) m.evs = { hp: 0, atk: 0, def: 0, spa: 0, spd: 0, spe: 0 };
+    if (!m.statStages) m.statStages = { atk: 0, def: 0, spa: 0, spd: 0, spe: 0 };
+    if (!m.learnableMoves) m.learnableMoves = [];
+    if (!m.berries) m.berries = { sitrusBerry: 0, oranBerry: 0, lumBerry: 0, chestoBerry: 0, rawstBerry: 0 };
+  });
+}
+
+function saveGame() {
+  validateGameState();
+  saveVersion++;
+  const saveData = getFullSaveData();
   try {
     localStorage.setItem(lsKey('save'), JSON.stringify(saveData));
+    localStorage.setItem(lsKey('save_ts'), String(Date.now()));
+    localStorage.setItem(lsKey('save_v'), String(saveVersion));
   } catch (e) {
-    console.warn('Save failed (storage full?)', e);
+    console.warn('localStorage save failed — clearing old data', e);
+    try {
+      // Try to free space and retry
+      localStorage.removeItem(lsKey('save_backup'));
+      localStorage.setItem(lsKey('save'), JSON.stringify(saveData));
+    } catch (e2) {
+      console.error('CRITICAL: Cannot save to localStorage', e2);
+    }
   }
 }
 
@@ -2551,14 +2624,16 @@ function loadGame() {
     if (!raw) return false;
     const data = JSON.parse(raw);
 
+    // Version tracking
+    saveVersion = parseInt(localStorage.getItem(lsKey('save_v')) || '0');
+    lastCloudSync = parseInt(localStorage.getItem(lsKey('save_ts')) || '0');
+
     currentLocationId = data.currentLocationId || 'pallet_town';
     currentRegion = data.currentRegion || 'kanto';
 
-    // Load inventory — with migration from old format
     if (data.inventory) {
       inventory = { ...data.inventory };
     } else {
-      // Old format: migrate individual fields
       const OLD_MAP = {
         invPokeballs: 'pokeball', invGreatBall: 'greatBall', invUltraBall: 'ultraBall',
         invPotion: 'potion', invCandy: 'candy', invVitamin: 'vitamin',
@@ -2573,13 +2648,20 @@ function loadGame() {
         if (data[oldKey] !== undefined) inventory[newKey] = data[oldKey];
       }
     }
-    // Ensure all ITEMS keys exist
     ITEMS.forEach(item => { if (!(item.id in inventory)) inventory[item.id] = 0; });
     syncOldInventory();
     money = data.money ?? 500;
     badges = data.badges || [];
     trainerNickname = data.trainerNickname || '';
     myTeam = data.myTeam || [];
+    // Rehydrate team
+    myTeam.forEach(m => {
+      if (!m.uid) m.uid = generateUID();
+      if (!m.statStages) m.statStages = { atk: 0, def: 0, spa: 0, spd: 0, spe: 0 };
+      if (!m.learnableMoves) m.learnableMoves = [];
+      if (!m.berries) m.berries = { sitrusBerry: 0, oranBerry: 0, lumBerry: 0, chestoBerry: 0, rawstBerry: 0 };
+      if (m.currentHp === undefined || m.currentHp < 0) m.currentHp = m.maxHp || 50;
+    });
     currentPokemonIndex = data.currentPokemonIndex ?? null;
     pokedexSeen = new Set(data.pokedexSeen || []);
     pokedexCaught = new Set(data.pokedexCaught || []);
@@ -2592,21 +2674,30 @@ function loadGame() {
     itemsUsedInBattle = data.itemsUsedInBattle || 0;
     itemHistory = data.itemHistory || [];
     pcBoxes = data.pcBoxes || [[]];
+    // Rehydrate PC pokemon
+    pcBoxes.forEach(box => box.forEach(m => {
+      if (!m.uid) m.uid = generateUID();
+      if (m.currentHp === undefined || m.currentHp < 0) m.currentHp = m.maxHp || 50;
+      if (!m.statStages) m.statStages = { atk: 0, def: 0, spa: 0, spd: 0, spe: 0 };
+    }));
     daycareMons = data.daycareMons || [];
+    daycareMons.forEach(e => { if (!e.mon.currentHp || e.mon.currentHp < 0) e.mon.currentHp = e.mon.maxHp || 50; });
     daycareEgg = data.daycareEgg || null;
     lastLocation = data.lastLocation || null;
     expShareActive = data.expShareActive || false;
-    // Rehydrate daycare mon methods
-    daycareMons.forEach(e => { if (!e.mon.currentHp) e.mon.currentHp = e.mon.maxHp || 50; });
 
+    validateGameState();
     return true;
   } catch (e) {
-    console.warn('Load failed', e);
+    console.warn('Load failed — data corrupted', e);
+    // Keep backup of corrupted data for debugging
+    try { localStorage.setItem(lsKey('save_corrupted'), raw || ''); } catch (_) {}
     return false;
   }
 }
 
 function autoSave() {
+  validateGameState();
   saveGame();
   cloudSave();
 }
@@ -7115,47 +7206,47 @@ function getLeaderboardData() {
 
 function cloudSave() {
   if (!tgToken) return;
-  if (cloudSaveTimer) {
-    clearTimeout(cloudSaveTimer);
-  }
-  cloudSaveTimer = setTimeout(async () => {
-    try {
-      const saveData = {
-        currentLocationId, currentRegion,
-        inventory: { ...inventory },
-        money, badges,
-        myTeam,
-        currentPokemonIndex,
-        pokedexSeen: Array.from(pokedexSeen),
-        pokedexCaught: Array.from(pokedexCaught),
-        pcBoxes,
-        npcQuestProgress, completedNPCQuests,
-        quests, questProgress, completedQuests,
-        visitedLocations: Array.from(visitedLocations),
-        daycareMons, daycareEgg, lastLocation,
-      };
-      const lb = getLeaderboardData();
-      await fetch(`${API_BASE}/save`, {
-        method: 'POST',
-        headers: getCloudAuthHeaders(),
-        body: JSON.stringify({ saveData, ...lb })
-      });
-      const btnSync = document.getElementById('btn-cloud-sync');
-      if (btnSync) { btnSync.textContent = '☁️✓'; setTimeout(() => { btnSync.textContent = '☁️ Авто'; }, 1500); }
-    } catch (e) {
-      console.warn('Cloud save failed', e);
+  if (cloudSaveTimer) clearTimeout(cloudSaveTimer);
+  cloudSaveTimer = setTimeout(() => doCloudSave(), 2000);
+}
+
+async function doCloudSave(attempt = 0) {
+  validateGameState();
+  const saveData = getFullSaveData();
+  const lb = getLeaderboardData();
+
+  try {
+    const res = await fetch(`${API_BASE}/save`, {
+      method: 'POST',
+      headers: getCloudAuthHeaders(),
+      body: JSON.stringify({ saveData, ...lb, saveVersion })
+    });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const result = await res.json();
+    lastCloudSync = Date.now();
+    saveRetryCount = 0;
+    localStorage.setItem(lsKey('save_sync'), String(lastCloudSync));
+    const btnSync = document.getElementById('btn-cloud-sync');
+    if (btnSync) { btnSync.textContent = '☁️✓'; setTimeout(() => { btnSync.textContent = '☁️ Авто'; }, 1500); }
+    return result;
+  } catch (e) {
+    console.warn(`Cloud save failed (attempt ${attempt + 1}/${MAX_RETRIES})`, e.message);
+    if (attempt < MAX_RETRIES - 1) {
+      saveRetryCount = attempt + 1;
+      const delay = RETRY_DELAYS[attempt];
+      setTimeout(() => doCloudSave(attempt + 1), delay);
+    } else {
+      saveRetryCount = MAX_RETRIES;
       const btnSync = document.getElementById('btn-cloud-sync');
       if (btnSync) { btnSync.textContent = '☁️✗'; setTimeout(() => { btnSync.textContent = '☁️ Авто'; }, 3000); }
     }
-  }, 3000);
+  }
 }
 
 async function cloudLoad() {
   if (!tgToken) return null;
   try {
-    const res = await fetch(`${API_BASE}/save`, {
-      headers: getCloudAuthHeaders()
-    });
+    const res = await fetch(`${API_BASE}/save`, { headers: getCloudAuthHeaders() });
     if (!res.ok) return null;
     const data = await res.json();
     return data.saveData;
@@ -7167,64 +7258,41 @@ async function cloudLoad() {
 
 function applyCloudSave(data) {
   if (!data || !data.myTeam) return;
-  let merged = false;
-  const localTeamLen = myTeam.length;
-  const cloudTeamLen = data.myTeam.length;
+  const cloudV = data._v || 0;
+  if (cloudV <= saveVersion) return; // Server is older or same — skip
 
-  if (cloudTeamLen > localTeamLen) {
-    currentLocationId = data.currentLocationId || currentLocationId;
-    myTeam = data.myTeam;
-    currentPokemonIndex = data.currentPokemonIndex ?? currentPokemonIndex;
+  // Server has newer data — use it
+  console.log(`[sync] Server v${cloudV} > local v${saveVersion} — applying server data`);
+  currentLocationId = data.currentLocationId || currentLocationId;
+  currentRegion = data.currentRegion || currentRegion;
+  if (data.inventory) inventory = { ...data.inventory };
+  money = data.money ?? money;
+  badges = data.badges || badges;
+  trainerNickname = data.trainerNickname || trainerNickname;
+  myTeam = data.myTeam || myTeam;
+  // Rehydrate team
+  myTeam.forEach(m => {
+    if (!m.statStages) m.statStages = { atk: 0, def: 0, spa: 0, spd: 0, spe: 0 };
+    if (!m.learnableMoves) m.learnableMoves = [];
+    if (!m.berries) m.berries = { sitrusBerry: 0, oranBerry: 0, lumBerry: 0, chestoBerry: 0, rawstBerry: 0 };
+  });
+  currentPokemonIndex = data.currentPokemonIndex ?? currentPokemonIndex;
+  pokedexSeen = new Set(data.pokedexSeen || []);
+  pokedexCaught = new Set(data.pokedexCaught || []);
+  pcBoxes = data.pcBoxes || pcBoxes;
+  pcBoxes.forEach(box => box.forEach(m => {
+    if (!m.statStages) m.statStages = { atk: 0, def: 0, spa: 0, spd: 0, spe: 0 };
+  }));
+  daycareMons = data.daycareMons || daycareMons;
+  daycareEgg = data.daycareEgg || daycareEgg;
+  lastLocation = data.lastLocation || lastLocation;
+  expShareActive = data.expShareActive || expShareActive;
+  saveVersion = cloudV;
+  validateGameState();
 
-    // Migrate inventory from cloud — handle both old and new format
-    if (data.inventory) {
-      inventory = { ...data.inventory };
-    } else {
-      // Old format: migrate individual fields
-      const OLD_MAP = {
-        invPokeballs: 'pokeball', invGreatBall: 'greatBall', invUltraBall: 'ultraBall',
-        invPotion: 'potion', invCandy: 'candy', invVitamin: 'vitamin',
-        invTrain: 'train', invWeaken: 'weaken',
-        invSuperPotion: 'superPotion', invFullRestore: 'fullRestore',
-        invEvolutionStone: 'evolutionStone', invTM: 'tm',
-      };
-      for (const [oldKey, newKey] of Object.entries(OLD_MAP)) {
-        if (data[oldKey] !== undefined) inventory[newKey] = data[oldKey];
-      }
-    }
-    // Ensure all ITEMS keys exist
-    ITEMS.forEach(item => { if (!(item.id in inventory)) inventory[item.id] = 0; });
-    syncOldInventory();
-
-    money = data.money ?? money;
-    badges = data.badges || badges;
-    if (data.pcBoxes) pcBoxes = data.pcBoxes;
-    if (data.lastLocation) lastLocation = data.lastLocation;
-    merged = true;
-  }
-
-  // Always merge quest/NPC progress (non-destructive)
-  if (data.npcQuestProgress) {
-    for (const [k, v] of Object.entries(data.npcQuestProgress)) {
-      if (!npcQuestProgress[k] || v > npcQuestProgress[k]) npcQuestProgress[k] = v;
-    }
-  }
-  if (data.completedNPCQuests) {
-    data.completedNPCQuests.forEach(q => { if (!completedNPCQuests.includes(q)) completedNPCQuests.push(q); });
-  }
-  if (data.quests && data.quests.length > 0 && quests.length === 0) {
-    quests = data.quests;
-    questProgress = data.questProgress || {};
-    completedQuests = data.completedQuests || [];
-  }
-  if (data.visitedLocations) {
-    data.visitedLocations.forEach(loc => visitedLocations.add(loc));
-  }
-
-  if (merged) {
-    saveGame();
-    console.log('Cloud save applied (team:', cloudTeamLen, ')');
-  }
+  // Save reconciled state locally
+  saveGame();
+  console.log('[sync] Applied server save v' + cloudV);
 }
 
 async function openLeaderboard() {
