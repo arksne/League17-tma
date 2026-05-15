@@ -39,8 +39,16 @@ async function claudeAutoReply(userText, io, db, username) {
   const cmd = parts[0].toLowerCase();
   let reply = null;
 
-  if (cmd === '!help' || cmd === '!помощь' || cmd === '!хелп' || cmd === '!команды') {
+  if (t.startsWith('/claude') || t.startsWith('/клод')) {
+    const msg = t.replace(/^\/claude\s*|^\/клод\s*/i, '');
+    if (!msg) { reply = 'ℹ️ Формат: /claude <сообщение>. Claude Code увидит и ответит.'; }
+    else {
+      console.log('[CLAUDE_CMD] from', username, ':', msg);
+      reply = `🤖 Принято! Claude обрабатывает: "${msg.slice(0,60)}${msg.length>60?'...':''}"`;
+    }
+  } else if (cmd === '!help' || cmd === '!помощь' || cmd === '!хелп' || cmd === '!команды') {
     reply = `🤖 Команды Claude:
+/claude ТЕКСТ — передать сообщение Claude Code (отвечу позже)
 !статус — статистика сервера
 !игроки — список игроков
 !лог — последние сообщения чата
