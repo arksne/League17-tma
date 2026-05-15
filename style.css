@@ -2002,45 +2002,8 @@ input[type="number"] {
   cursor: not-allowed;
 }
 
-/* RIGHT: CHAT SIDEBAR */
-.chat-sidebar {
-  width: 170px;
-  flex-shrink: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  overflow-y: auto;
-}
-.chat-sidebar-section {
-  background: var(--tma-card-bg);
-  border: 1px solid var(--tma-border);
-  border-radius: 6px;
-  padding: 8px 10px;
-}
-.chat-sidebar-title {
-  font-size: 0.7rem;
-  color: var(--tma-text-muted);
-  font-weight: 600;
-  margin-bottom: 6px;
-  padding-bottom: 4px;
-  border-bottom: 1px solid var(--tma-border);
-}
-.trainer-card { display: none; }
-.trainer-card-header { display: none; }
-.trainer-avatar { display: none; }
-.trainer-name { display: none; }
-.trainer-stats { display: none; }
-.trainer-stat { display: none; }
-.trainer-stat-label { display: none; }
-.trainer-stat-value { display: none; }
-.trainer-team-label { display: none; }
-.trainer-team { display: none; }
-.trainer-team-empty { display: none; }
-.trainer-team-mon { display: none; }
-.trainer-team-mon-img { display: none; }
-.trainer-location-trainers { display: none; }
-.trainer-location-label { display: none; }
-/* OLD: .trainer-card {
+/* RIGHT: TRAINER CARD */
+.trainer-card {
   width: 160px;
   flex-shrink: 0;
   display: flex;

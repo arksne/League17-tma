@@ -6,8 +6,8 @@
     <title>League-17 TMA</title>
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-    <script type="module" crossorigin src="/League17-tma/assets/index-BNV8OQzh.js"></script>
-    <link rel="stylesheet" crossorigin href="/League17-tma/assets/index-eCNkZcAW.css">
+    <script type="module" crossorigin src="/League17-tma/assets/index-ulmz32sV.js"></script>
+    <link rel="stylesheet" crossorigin href="/League17-tma/assets/index-BISajQ1w.css">
   </head>
   <body>
     <div class="tma-container">
@@ -295,34 +295,55 @@
         </div>
 
         <!-- ======================= -->
-        <!-- VIEW 5: CHAT -->
+        <!-- VIEW 5: CHAT + TRAINER CARD -->
         <!-- ======================= -->
         <div id="view-chat" class="app-view">
           <div class="chat-layout">
+
+            <!-- LEFT: CHAT -->
             <div class="chat-panel">
-              <div class="chat-header">
-                Общий чат
-                <span id="chat-online-count" style="font-size:0.75rem;color:var(--tma-text-muted);margin-left:8px;"></span>
-              </div>
+              <div class="chat-header">Общий чат</div>
               <div class="chat-messages" id="chat-messages">
                 <div class="chat-loading">Загрузка сообщений...</div>
               </div>
               <div class="chat-input-area">
-                <input class="chat-input" id="chat-input" type="text" placeholder="Введите сообщение... /claude для связи с ИИ" maxlength="500">
+                <input class="chat-input" id="chat-input" type="text" placeholder="Введите сообщение..." maxlength="500">
                 <button class="chat-send-btn" id="chat-send-btn">Отпр.</button>
               </div>
             </div>
 
-            <div class="chat-sidebar">
-              <div class="chat-sidebar-section">
-                <div class="chat-sidebar-title">📍 Тренеры на локации</div>
-                <div class="trainer-location-list" id="trainer-location-list">-</div>
+            <!-- RIGHT: TRAINER CARD -->
+            <div class="trainer-card">
+              <div class="trainer-card-header">
+                <div class="trainer-avatar" id="trainer-avatar">👤</div>
+                <div class="trainer-name" id="trainer-name">Загрузка...</div>
               </div>
-              <div class="chat-sidebar-section">
-                <div class="chat-sidebar-title">🟢 В сети</div>
-                <div id="chat-online-list" style="font-size:0.8rem;color:var(--tma-text-muted);">-</div>
+              <div class="trainer-stats">
+                <div class="trainer-stat">
+                  <span class="trainer-stat-label">Кредиты</span>
+                  <span class="trainer-stat-value" id="trainer-money">¥500</span>
+                </div>
+                <div class="trainer-stat">
+                  <span class="trainer-stat-label">Значки</span>
+                  <span class="trainer-stat-value" id="trainer-badges">0</span>
+                </div>
+                <div class="trainer-stat">
+                  <span class="trainer-stat-label">Поймано</span>
+                  <span class="trainer-stat-value" id="trainer-caught">0/151</span>
+                </div>
+              </div>
+
+              <div class="trainer-location-trainers" id="trainer-location-trainers">
+                <div class="trainer-location-label">Тренеры на локации:</div>
+                <div class="trainer-location-list" id="trainer-location-list">Загрузка...</div>
+              </div>
+
+              <div class="trainer-team-label">Команда</div>
+              <div class="trainer-team" id="trainer-team">
+                <div class="trainer-team-empty">Нет покемонов</div>
               </div>
             </div>
+
           </div>
         </div>
 
