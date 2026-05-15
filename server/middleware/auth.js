@@ -1,6 +1,29 @@
 import jwt from 'jsonwebtoken';
+import crypto from 'crypto';
+import fs from 'fs';
+import path from 'path';
+import { fileURLToPath } from 'url';
 
-const JWT_SECRET = process.env.JWT_SECRET || (console.warn('WARNING: JWT_SECRET not set, using insecure default!'), 'league17-dev-secret-2026');
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+const SECRET_FILE = path.join(__dirname, '../../data/jwt_secret');
+
+let JWT_SECRET = process.env.JWT_SECRET;
+if (!JWT_SECRET) {
+  try {
+    JWT_SECRET = fs.readFileSync(SECRET_FILE, 'utf8').trim();
+  } catch {
+    JWT_SECRET = crypto.randomBytes(32).toString('hex');
+    try {
+      fs.mkdirSync(path.dirname(SECRET_FILE), { recursive: true });
+      fs.writeFileSync(SECRET_FILE, JWT_SECRET);
+      console.warn('Generated and saved JWT_SECRET to disk. Set JWT_SECRET env var for production.');
+    } catch (e) {
+      console.warn('Could not persist JWT_SECRET to disk:', e.message);
+      console.warn('Sessions will be invalidated on next restart.');
+    }
+  }
+}
 
 export function authMiddleware(req, res, next) {
   const header = req.headers.authorization;

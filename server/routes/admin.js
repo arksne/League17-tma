@@ -1,19 +1,54 @@
 import { Router } from 'express';
 import { getDB } from '../db.js';
+import { authMiddleware } from '../middleware/auth.js';
 
 const router = Router();
 
-// Admin password
+// Admin usernames — these users can use admin API via JWT
+const ADMIN_USERNAMES = new Set(['DjafarAdjarov', 'nineinchkn5atmythroat']);
+
+// Admin password — fallback for dashboard and non-JWT access
 const ADMIN_PASS = 'league17admin2026';
 
-// Middleware: check admin token
+// Middleware: check admin password OR JWT from admin-list user
 function adminAuth(req, res, next) {
   const token = req.query.token || req.headers['x-admin-token'];
   if (token === ADMIN_PASS) return next();
+  if (!token) {
+    // Try JWT auth — only allow users in ADMIN_USERNAMES
+    return authMiddleware(req, res, () => {
+      if (req.adminUsername && ADMIN_USERNAMES.has(req.adminUsername)) return next();
+      // We need the username — let's check after authMiddleware
+      return dbLookupAuth(req, res, next);
+    });
+  }
   if (req.path === '/' && !token) {
     return res.send(loginPage());
   }
-  return res.status(401).json({ error: 'Unauthorized. Use ?token=PASSWORD' });
+  return res.status(401).json({ error: 'Unauthorized. Use ?token=PASSWORD or JWT' });
+}
+
+async function dbLookupAuth(req, res, next) {
+  const db = getDB();
+  const user = await db.get('SELECT username FROM users WHERE id = ?', req.userId);
+  if (user && ADMIN_USERNAMES.has(user.username)) {
+    req.adminUsername = user.username;
+    return next();
+  }
+  return res.status(403).json({ error: 'Admin access required' });
+}
+
+// JWT-based admin access check (for client-side admin panel)
+async function jwtAdminAuth(req, res, next) {
+  return authMiddleware(req, res, async () => {
+    const db = getDB();
+    const user = await db.get('SELECT username FROM users WHERE id = ?', req.userId);
+    if (user && ADMIN_USERNAMES.has(user.username)) {
+      req.adminUsername = user.username;
+      return next();
+    }
+    return res.status(403).json({ error: 'Admin access required' });
+  });
 }
 
 function loginPage() {
@@ -231,6 +266,103 @@ router.get('/api', adminAuth, async (req, res) => {
       result = { status: 'ok', mons: data.myTeam.length };
     } else {
       result.error = 'Unknown command: '+cmd;
+    }
+  } catch(e) { result.error = e.message; }
+  res.json(result);
+});
+
+// JWT-authorized admin API (for client-side admin panel, no password needed)
+router.get('/jwt-api', jwtAdminAuth, async (req, res) => {
+  const { cmd, user, val } = req.query;
+  const db = getDB();
+  let result = { cmd, user };
+
+  async function resolveUser(idOrName) {
+    const byId = await db.get('SELECT id FROM users WHERE id = ?', parseInt(idOrName));
+    if (byId) return byId;
+    return await db.get('SELECT id FROM users WHERE username = ?', idOrName);
+  }
+
+  try {
+    const u = await resolveUser(user);
+    if (!u) { result.error = 'User not found'; return res.json(result); }
+
+    if (cmd === 'give_items') {
+      const save = await db.get('SELECT save_data FROM game_saves WHERE user_id = ?', u.id);
+      if (!save) { result.error = 'No save data'; return res.json(result); }
+      let data = JSON.parse(save.save_data);
+      if (!data.inventory) data.inventory = {};
+      const ALL_ITEMS = ['pokeball','greatBall','ultraBall','masterBall','quickBall','friendBall','loveBall','duskBall','timerBall','darkBall','potion','superPotion','fullRestore','candy','vitamin','train','weaken','evolutionStone','fireStone','waterStone','leafStone','thunderStone','moonStone','sunStone','shinyStone','duskStone','iceStone','dawnStone','tm','ppUp','sitrusBerry','oranBerry','lumBerry','chestoBerry','rawstBerry','antidote','antiparalyze','energyDrink','fireExtinguisher','healingHerb','weakElixir','elixir','strongElixir','xAttack','xDefense','xSpDefense','xSpAttack','xSpeed','protein','iron','calcium','zinc','carbos','luckyEgg','expShare','oldRod','goodRod','superRod','darkBall'];
+      ALL_ITEMS.forEach(id => { data.inventory[id] = 999; });
+      data.money = (data.money || 0) + 500000;
+      await db.run('UPDATE game_saves SET save_data = ?, updated_at = datetime(\'now\') WHERE user_id = ?', JSON.stringify(data), u.id);
+      result = { status: 'ok', items: ALL_ITEMS.length, money: data.money };
+    } else if (cmd === 'give_money') {
+      const save = await db.get('SELECT save_data FROM game_saves WHERE user_id = ?', u.id);
+      if (!save) { result.error = 'No save'; return res.json(result); }
+      let data = JSON.parse(save.save_data);
+      data.money = (data.money || 0) + parseInt(val || 100000);
+      await db.run('UPDATE game_saves SET save_data = ?, updated_at = datetime(\'now\') WHERE user_id = ?', JSON.stringify(data), u.id);
+      result = { status: 'ok', money: data.money };
+    } else if (cmd === 'give_badges') {
+      const save = await db.get('SELECT save_data FROM game_saves WHERE user_id = ?', u.id);
+      if (!save) { result.error = 'No save'; return res.json(result); }
+      let data = JSON.parse(save.save_data);
+      data.badges = ['Boulder Badge','Cascade Badge','Thunder Badge','Rainbow Badge','Marsh Badge','Soul Badge','Volcano Badge','Earth Badge'];
+      await db.run('UPDATE game_saves SET save_data = ?, updated_at = datetime(\'now\') WHERE user_id = ?', JSON.stringify(data), u.id);
+      result = { status: 'ok', badges: 8 };
+    } else if (cmd === 'give_legendary') {
+      const save = await db.get('SELECT save_data FROM game_saves WHERE user_id = ?', u.id);
+      if (!save) { result.error = 'No save'; return res.json(result); }
+      let data = JSON.parse(save.save_data);
+      const legends = ['mewtwo','mew','lugia','ho-oh','rayquaza','groudon','kyogre','dialga','palkia','giratina','zekrom','reshiram'];
+      const pick = legends[Math.floor(Math.random()*legends.length)];
+      try {
+        const pokeRes = await fetch(`https://pokeapi.co/api/v2/pokemon/${pick}`);
+        const pokeData = await pokeRes.json();
+        const newMon = {
+          uid: Date.now().toString(36)+Math.random().toString(36).substr(2,6),
+          originalTrainer: String(u.id), createdAt: Date.now(), caughtLocation: 'admin',
+          apiData: pokeData, maxHp: 200, currentHp: 200,
+          ivs: {hp:31,atk:31,def:31,spa:31,spd:31,spe:31},
+          evs: {hp:0,atk:0,def:0,spa:0,spd:0,spe:0},
+          baseLevel: 70, exp: 343000, expToNext: 357911,
+          candiesEaten:0, vitaminsEaten:0, training:null, trainingStage:0, trainingStat:null,
+          happiness:70, natureIdx:0, breedLetter:'S', status:null, sleepTurns:0,
+          movesPP:[], statStages:{atk:0,def:0,spa:0,spd:0,spe:0},
+          abilityName: pokeData.abilities[0]?.ability?.name||null,
+          heldItem:null, berries:{sitrusBerry:0,oranBerry:0,lumBerry:0,chestoBerry:0,rawstBerry:0},
+          learnableMoves:[]
+        };
+        data.myTeam = data.myTeam || [];
+        if (data.myTeam.length >= 6) data.myTeam[0] = newMon;
+        else data.myTeam.push(newMon);
+        await db.run('UPDATE game_saves SET save_data = ?, updated_at = datetime(\'now\') WHERE user_id = ?', JSON.stringify(data), u.id);
+        result = { status: 'ok', pokemon: pick, teamSize: data.myTeam.length };
+      } catch(e) { result.error = 'PokeAPI failed: '+e.message; }
+    } else if (cmd === 'heal_team') {
+      const save = await db.get('SELECT save_data FROM game_saves WHERE user_id = ?', u.id);
+      if (!save) { result.error = 'No save'; return res.json(result); }
+      let data = JSON.parse(save.save_data);
+      (data.myTeam||[]).forEach(m => { m.currentHp = m.maxHp; m.status = null; m.sleepTurns = 0; });
+      await db.run('UPDATE game_saves SET save_data = ?, updated_at = datetime(\'now\') WHERE user_id = ?', JSON.stringify(data), u.id);
+      result = { status: 'ok', healed: (data.myTeam||[]).length };
+    } else if (cmd === 'max_iv') {
+      const save = await db.get('SELECT save_data FROM game_saves WHERE user_id = ?', u.id);
+      if (!save) { result.error = 'No save'; return res.json(result); }
+      let data = JSON.parse(save.save_data);
+      (data.myTeam||[]).forEach(m => { m.ivs = {hp:31,atk:31,def:31,spa:31,spd:31,spe:31}; });
+      await db.run('UPDATE game_saves SET save_data = ?, updated_at = datetime(\'now\') WHERE user_id = ?', JSON.stringify(data), u.id);
+      result = { status: 'ok', maxed: (data.myTeam||[]).length };
+    } else if (cmd === 'fix_levels') {
+      const save = await db.get('SELECT save_data FROM game_saves WHERE user_id = ?', u.id);
+      if (!save) { result.error = 'No save'; return res.json(result); }
+      let data = JSON.parse(save.save_data);
+      (data.myTeam||[]).forEach(m => { if(m.baseLevel < 50) m.baseLevel = 50; m.maxHp = Math.floor(m.maxHp * 1.5); m.currentHp = m.maxHp; });
+      await db.run('UPDATE game_saves SET save_data = ?, updated_at = datetime(\'now\') WHERE user_id = ?', JSON.stringify(data), u.id);
+      result = { status: 'ok', fixed: (data.myTeam||[]).length };
+    } else {
+      result.error = 'Unknown command: ' + cmd;
     }
   } catch(e) { result.error = e.message; }
   res.json(result);

@@ -4,6 +4,7 @@
   --tma-text: #e8f0f8;
   --tma-text-muted: #8ab0d0;
   --tma-primary: #5ba0e8;
+  --tma-accent: #f0d060;
   --tma-border: #2a5a7a;
 
   --stat-hp: #ff3b30;
@@ -22,6 +23,7 @@
   --tma-text: #d0e0f0;
   --tma-text-muted: #6a9aba;
   --tma-primary: #4a90d0;
+  --tma-accent: #e0c050;
   --tma-border: #1a4a6a;
 }
 
@@ -648,19 +650,6 @@ body::before {
   overflow: hidden;
   position: relative;
   z-index: 1;
-}
-
-.reborn-gym-info {
-  text-align: center;
-  padding: 3px 0;
-}
-
-.reborn-gym-badge {
-  color: #f0d060;
-  font-weight: 600;
-  font-size: 0.75rem;
-  text-transform: uppercase;
-  letter-spacing: 1px;
 }
 
 .reborn-controls {
@@ -1533,7 +1522,7 @@ input[type="number"] {
 .poke-name {
   font-size: 0.6rem;
   text-transform: capitalize;
-  color: #333;
+  color: var(--tma-text);
   display: block;
   margin-top: 2px;
   white-space: nowrap;

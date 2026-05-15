@@ -23,10 +23,11 @@ router.post('/tg', async (req, res) => {
       return res.status(403).json({ error: 'Telegram authentication required' });
     }
     if (!botToken) {
-      console.error('BOT_TOKEN is not set in environment variables!');
-      return res.status(500).json({ error: 'Server misconfiguration' });
+      console.warn('BOT_TOKEN is not set — Telegram init data verification is SKIPPED. Set BOT_TOKEN in production!');
+      tgUser = parseTestUser(initData);
+    } else {
+      tgUser = verifyTelegramInitData(initData, botToken);
     }
-    tgUser = verifyTelegramInitData(initData, botToken);
     if (!tgUser) {
       return res.status(403).json({ error: 'Invalid Telegram init data' });
     }

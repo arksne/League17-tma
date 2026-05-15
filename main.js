@@ -1571,7 +1571,8 @@ function initAdminPanel() {
       if (!tid) { showToast('Сначала 🔍 найди тренера по ID', true); return; }
       const act = btn.getAttribute('data-act');
       try {
-        const res = await fetch(`/admin/api?token=league17admin2026&cmd=give_${act}&user=${tid}`);
+        const headers = tgToken ? { 'Authorization': `Bearer ${tgToken}` } : {};
+        const res = await fetch(`/admin/jwt-api?cmd=give_${act}&user=${tid}`, { headers });
         const d = await res.json();
         showToast(d.status === 'ok' ? '✅ Готово' : '❌ ' + (d.error || 'ошибка'), d.status !== 'ok');
       } catch(e) { showToast('Ошибка API', true); }
@@ -1977,7 +1978,7 @@ function getDailyWeather(locId) {
     hash = ((hash << 5) - hash) + str.charCodeAt(i);
     hash |= 0;
   }
-  const idx = Math.abs(hash) % WEATHERS.length;
+  const idx = (Math.abs(hash || 0) || 0) % WEATHERS.length;
   return WEATHERS[idx];
 }
 
@@ -2659,11 +2660,12 @@ function validateGameState() {
   // Ensure all ITEMS exist in inventory
   ITEMS.forEach(item => { if (!(item.id in inventory)) inventory[item.id] = 0; });
   // Validate team pokemon have required fields
-  myTeam.forEach((m, i) => {
+  for (let i = myTeam.length - 1; i >= 0; i--) {
+    const m = myTeam[i];
+    if (!m.apiData) { console.warn('Pokemon without apiData at index', i, '— removing'); myTeam.splice(i, 1); continue; }
     if (!m.uid) m.uid = generateUID();
     if (!m.originalTrainer) m.originalTrainer = getTrainerId();
     if (!m.createdAt) m.createdAt = Date.now();
-    if (!m.apiData) { console.warn('Pokemon without apiData at index', i, '— removing'); myTeam.splice(i, 1); return; }
     if (!m.maxHp || m.maxHp <= 0) m.maxHp = 50;
     if (m.currentHp === undefined || m.currentHp < 0) m.currentHp = m.maxHp;
     if (!m.ivs) m.ivs = { hp: 15, atk: 15, def: 15, spa: 15, spd: 15, spe: 15 };
@@ -2671,15 +2673,18 @@ function validateGameState() {
     if (!m.statStages) m.statStages = { atk: 0, def: 0, spa: 0, spd: 0, spe: 0 };
     if (!m.learnableMoves) m.learnableMoves = [];
     if (!m.berries) m.berries = { sitrusBerry: 0, oranBerry: 0, lumBerry: 0, chestoBerry: 0, rawstBerry: 0 };
-  });
+  }
 }
 
 function saveGame() {
   validateGameState();
   saveVersion++;
   const saveData = getFullSaveData();
-  // Sync money ↔ inventory credit
-  if (inventory['credit'] !== undefined) inventory['credit'] = money;
+  // Sync money ↔ inventory credit (money is canonical source)
+  if (inventory['credit'] !== undefined && inventory['credit'] !== money) {
+    console.warn('Credit/money desync detected:', { credit: inventory['credit'], money });
+    inventory['credit'] = money;
+  }
 
   try {
     localStorage.setItem(lsKey('save'), JSON.stringify(saveData));
@@ -2688,9 +2693,12 @@ function saveGame() {
   } catch (e) {
     console.warn('localStorage save failed — clearing old data', e);
     try {
-      // Try to free space and retry
-      localStorage.removeItem(lsKey('save_backup'));
+      // Try to free space and retry: remove all known large keys
+      const keysToRemove = ['save_backup', 'save', 'save_ts', 'save_v', 'quest_date', 'pokedex_seen', 'pokedex_caught'];
+      for (const k of keysToRemove) localStorage.removeItem(lsKey(k));
       localStorage.setItem(lsKey('save'), JSON.stringify(saveData));
+      localStorage.setItem(lsKey('save_ts'), String(Date.now()));
+      localStorage.setItem(lsKey('save_v'), String(saveVersion));
     } catch (e2) {
       console.error('CRITICAL: Cannot save to localStorage', e2);
     }
@@ -2901,7 +2909,12 @@ async function giveStarterMon(pokemonName) {
     newMon.currentHp = maxHp;
     newMon.maxHp = maxHp;
 
-    myTeam.push(newMon);
+    if (myTeam.length < 6) {
+      myTeam.push(newMon);
+    } else {
+      if (pcBoxes.length === 0) pcBoxes.push([]);
+      pcBoxes[0].push(newMon);
+    }
     pokedexSeen.add(pokemonName);
     pokedexCaught.add(pokemonName);
     renderLocation(currentLocationId);
@@ -3431,11 +3444,21 @@ function calculateStat(pokemon, statName, isWild) {
   const iv = isWild ? (pokemon.wildIVs ? pokemon.wildIVs[mapName] : 15) : pokemon.ivs[mapName];
   const ev = isWild ? 0 : pokemon.evs[mapName];
 
+  // Nature modifier (non-HP stats only, player mons only)
+  let natureMod = 1.0;
+  if (statName !== 'hp' && !isWild && pokemon.natureIdx !== undefined) {
+    const nature = NATURES[pokemon.natureIdx];
+    if (nature) {
+      if (nature.buff === mapName) natureMod = 1.1;
+      else if (nature.nerf === mapName) natureMod = 0.9;
+    }
+  }
+
   let result;
   if (statName === 'hp') {
     result = Math.floor(0.01 * (2 * base + iv + Math.floor(0.25 * ev)) * level) + level + 10;
   } else {
-    result = Math.floor((Math.floor((2 * base + iv + Math.floor(0.25 * ev)) * level / 100) + 5) * 1.0);
+    result = Math.floor((Math.floor((2 * base + iv + Math.floor(0.25 * ev)) * level / 100) + 5) * natureMod);
   }
 
   // Apply stat stages
@@ -4161,35 +4184,46 @@ async function startHunt(encountersArray) {
     }
 
     playerMovesDetailed = [];
-    for (let i = 0; i < 4; i++) {
-      if (activePlayerMon.apiData.moves[i]) {
-        const url = activePlayerMon.apiData.moves[i].move.url;
-        fetch(url)
-          .then(r => r.json())
-          .then(d => {
-            playerMovesDetailed[i] = d;
-            if (!activePlayerMon.movesPP) activePlayerMon.movesPP = [];
-            if (!activePlayerMon.movesPP[i]) {
-              activePlayerMon.movesPP[i] = { current: d.pp || 30, max: d.pp || 30 };
-            }
-            updateMoveButtonUI(i, d);
-          });
-
-        const mBtn = document.getElementById(`move-btn-${i}`);
-        mBtn.innerText = activePlayerMon.apiData.moves[i].move.name;
-        mBtn.classList.remove('disabled');
-        mBtn.onclick = () => useMove(i);
-      } else {
-        const mBtn = document.getElementById(`move-btn-${i}`);
-        mBtn.innerText = '-';
-        mBtn.classList.add('disabled');
-        mBtn.onclick = null;
-      }
-    }
+    loadMoveButtons(activePlayerMon, useMove);
 
   } catch (e) {
     battleLog.innerText = 'Ошибка загрузки...';
     setTimeout(() => { modal.style.display = 'none'; }, 1000);
+  }
+}
+
+function loadMoveButtons(activeMon, clickHandler) {
+  playerMovesDetailed = [];
+  for (let i = 0; i < 4; i++) {
+    const mBtn = document.getElementById(`move-btn-${i}`);
+    if (activeMon.apiData.moves[i]) {
+      mBtn.innerText = '...';
+      mBtn.classList.add('disabled');
+      mBtn.onclick = null;
+      const url = activeMon.apiData.moves[i].move.url;
+      fetch(url)
+        .then(r => r.json())
+        .then(d => {
+          playerMovesDetailed[i] = d;
+          if (!activeMon.movesPP) activeMon.movesPP = [];
+          if (!activeMon.movesPP[i]) {
+            activeMon.movesPP[i] = { current: d.pp || 30, max: d.pp || 30 };
+          }
+          mBtn.innerText = activeMon.apiData.moves[i].move.name;
+          mBtn.classList.remove('disabled');
+          mBtn.onclick = () => clickHandler(i);
+          updateMoveButtonUI(i, d);
+        })
+        .catch(() => {
+          mBtn.innerText = activeMon.apiData.moves[i].move.name;
+          mBtn.classList.remove('disabled');
+          mBtn.onclick = () => clickHandler(i);
+        });
+    } else {
+      mBtn.innerText = '-';
+      mBtn.classList.add('disabled');
+      mBtn.onclick = null;
+    }
   }
 }
 
@@ -4408,9 +4442,9 @@ async function useMove(moveIndex) {
       updatePlayerHpUI();
     }
 
-    // Sturdy check: if wild would be OHKO'd, survive at 1 HP
+    // Sturdy check: survive OHKO from full HP
     const wildAbil = activeWild.abilities?.[0]?.ability?.name;
-    if (wildAbil === 'sturdy' && wildCurHP === 0 && wildCurHP < dmg && wildCurHP < wildMaxHP) {
+    if (wildAbil === 'sturdy' && wildCurHP === 0 && dmg >= wildMaxHP) {
       wildCurHP = 1;
       appendToLog(`${activeWild.name} выдерживает удар благодаря Прочной Броне!`);
     }
@@ -4587,31 +4621,8 @@ function handlePlayerFaint() {
       updatePlayerHpUI();
 
       // Load moves for new mon
-      playerMovesDetailed = [];
-      for (let i = 0; i < 4; i++) {
-        if (activePlayerMon.apiData.moves[i]) {
-          const url = activePlayerMon.apiData.moves[i].move.url;
-          fetch(url)
-            .then(r => r.json())
-            .then(d => {
-              playerMovesDetailed[i] = d;
-              if (!activePlayerMon.movesPP) activePlayerMon.movesPP = [];
-              if (!activePlayerMon.movesPP[i]) {
-                activePlayerMon.movesPP[i] = { current: d.pp || 30, max: d.pp || 30 };
-              }
-              updateMoveButtonUI(i, d);
-            });
-          const mBtn = document.getElementById(`move-btn-${i}`);
-          mBtn.innerText = activePlayerMon.apiData.moves[i].move.name;
-          mBtn.classList.remove('disabled');
-          mBtn.onclick = () => battleType === 'wild' ? useMove(i) : useMoveGym(i);
-        } else {
-          const mBtn = document.getElementById(`move-btn-${i}`);
-          mBtn.innerText = '-';
-          mBtn.classList.add('disabled');
-          mBtn.onclick = null;
-        }
-      }
+      const handler = battleType === 'wild' ? useMove : useMoveGym;
+      loadMoveButtons(activePlayerMon, handler);
 
       setTimeout(() => { document.getElementById('battle-main-menu').style.display = 'flex'; }, 1000);
       autoSave();
@@ -4839,12 +4850,12 @@ function initEncounterEvents() {
       catchRate = catchRate * ballCfg.mult;
 
       // Status bonus
-      if (wildStatus === 'sleep' || wildStatus === 'freeze') catchRate *= 2.5;
-      else if (wildStatus === 'paralysis' || wildStatus === 'burn' || wildStatus === 'poison') catchRate *= 1.5;
+      if (wildStatus === 'slp' || wildStatus === 'frz') catchRate *= 2.5;
+      else if (wildStatus === 'par' || wildStatus === 'brn' || wildStatus === 'psn') catchRate *= 1.5;
 
       // Ball special effects
       if (item === 'quickBall' && battleRound <= 1) catchRate *= 5;
-      if (item === 'duskBall' && dayPeriod === 'night') catchRate *= 3;
+      if (item === 'duskBall' && !isDaytime) catchRate *= 3;
       if (item === 'timerBall') catchRate *= 1 + battleRound * 0.3;
 
       // Love Ball: x8 if opposite gender
@@ -4891,7 +4902,7 @@ function initEncounterEvents() {
             movesPP: wildMovesPP ? wildMovesPP.map(pp => ({ current: pp.max, max: pp.max })) : [],
             statStages: { atk: 0, def: 0, spa: 0, spd: 0, spe: 0 },
             abilityName: activeWild.abilities[0]?.ability?.name || null,
-            heldItem: activeWild.heldItem || null,
+            heldItem: null,
             berries: activeWild.berries || { sitrusBerry: 0, oranBerry: 0, lumBerry: 0, chestoBerry: 0, rawstBerry: 0 },
             learnableMoves: []
           };
@@ -5254,27 +5265,7 @@ async function startGymNextPokemon() {
     }
 
     // Set up player moves
-    playerMovesDetailed = [];
-    for (let i = 0; i < 4; i++) {
-      if (activePlayerMon.apiData.moves[i]) {
-        const url = activePlayerMon.apiData.moves[i].move.url;
-        fetch(url)
-          .then(r => r.json())
-          .then(d => {
-            playerMovesDetailed[i] = d;
-            updateMoveButtonUI(i, d);
-          });
-        const mBtn = document.getElementById(`move-btn-${i}`);
-        mBtn.innerText = activePlayerMon.apiData.moves[i].move.name;
-        mBtn.classList.remove('disabled');
-        mBtn.onclick = () => useMoveGym(i);
-      } else {
-        const mBtn = document.getElementById(`move-btn-${i}`);
-        mBtn.innerText = '-';
-        mBtn.classList.add('disabled');
-        mBtn.onclick = null;
-      }
-    }
+    loadMoveButtons(activePlayerMon, useMoveGym);
 
   } catch (e) {
     appendToLog('Ошибка загрузки покемона лидера...');
@@ -5361,7 +5352,7 @@ async function useMoveGym(moveIndex) {
 
     // Sturdy check
     const wildAbil = activeWild.abilities?.[0]?.ability?.name;
-    if (wildAbil === 'sturdy' && wildCurHP === 0 && dmg > 0 && wildCurHP < wildMaxHP) {
+    if (wildAbil === 'sturdy' && wildCurHP === 0 && dmg >= wildMaxHP) {
       wildCurHP = 1;
       appendToLog(`${activeWild.name} выдерживает удар благодаря Прочной Броне!`);
     }
@@ -5369,7 +5360,6 @@ async function useMoveGym(moveIndex) {
     updateWildHpUI();
 
     if (typeMult > 1) appendToLog('Это суперэффективно!', false, 'eff');
-    if (typeMult < 1) appendToLog('Это не очень эффективно...', false, 'system');
     else if (typeMult < 1 && typeMult > 0) appendToLog('Это малоэффективно...');
     else if (typeMult === 0) appendToLog('Атака не возымела эффекта...');
 
@@ -5628,29 +5618,7 @@ function handleGymPlayerFaint() {
     document.getElementById('player-status-icon').innerText = getStatusIcon(activePlayerMon.status);
     updatePlayerHpUI();
 
-    playerMovesDetailed = [];
-    for (let i = 0; i < 4; i++) {
-      if (activePlayerMon.apiData.moves[i]) {
-        const url = activePlayerMon.apiData.moves[i].move.url;
-        fetch(url).then(r => r.json()).then(d => {
-          playerMovesDetailed[i] = d;
-          if (!activePlayerMon.movesPP) activePlayerMon.movesPP = [];
-          if (!activePlayerMon.movesPP[i]) {
-            activePlayerMon.movesPP[i] = { current: d.pp || 30, max: d.pp || 30 };
-          }
-          updateMoveButtonUI(i, d);
-        });
-        const mBtn = document.getElementById(`move-btn-${i}`);
-        mBtn.innerText = activePlayerMon.apiData.moves[i].move.name;
-        mBtn.classList.remove('disabled');
-        mBtn.onclick = () => useMoveGym(i);
-      } else {
-        const mBtn = document.getElementById(`move-btn-${i}`);
-        mBtn.innerText = '-';
-        mBtn.classList.add('disabled');
-        mBtn.onclick = null;
-      }
-    }
+    loadMoveButtons(activePlayerMon, useMoveGym);
 
     setTimeout(() => { document.getElementById('battle-main-menu').style.display = 'flex'; }, 1000);
   } else {
@@ -5803,25 +5771,7 @@ async function startEliteNextPokemon() {
     }
 
     // Set up player moves for elite battle
-    playerMovesDetailed = [];
-    for (let i = 0; i < 4; i++) {
-      if (activePlayerMon.apiData.moves[i]) {
-        const url = activePlayerMon.apiData.moves[i].move.url;
-        fetch(url).then(r => r.json()).then(d => {
-          playerMovesDetailed[i] = d;
-          updateMoveButtonUI(i, d);
-        });
-        const mBtn = document.getElementById(`move-btn-${i}`);
-        mBtn.innerText = activePlayerMon.apiData.moves[i].move.name;
-        mBtn.classList.remove('disabled');
-        mBtn.onclick = () => useMoveGym(i);
-      } else {
-        const mBtn = document.getElementById(`move-btn-${i}`);
-        mBtn.innerText = '-';
-        mBtn.classList.add('disabled');
-        mBtn.onclick = null;
-      }
-    }
+    loadMoveButtons(activePlayerMon, useMoveGym);
 
     // Player UI refresh
     document.getElementById('player-name').innerText = activePlayerMon.nickname || activePlayerMon.apiData.name;
@@ -5912,25 +5862,7 @@ async function startChampionNextPokemon() {
     }
 
     // Set up player moves for champion battle
-    playerMovesDetailed = [];
-    for (let i = 0; i < 4; i++) {
-      if (activePlayerMon.apiData.moves[i]) {
-        const url = activePlayerMon.apiData.moves[i].move.url;
-        fetch(url).then(r => r.json()).then(d => {
-          playerMovesDetailed[i] = d;
-          updateMoveButtonUI(i, d);
-        });
-        const mBtn = document.getElementById(`move-btn-${i}`);
-        mBtn.innerText = activePlayerMon.apiData.moves[i].move.name;
-        mBtn.classList.remove('disabled');
-        mBtn.onclick = () => useMoveGym(i);
-      } else {
-        const mBtn = document.getElementById(`move-btn-${i}`);
-        mBtn.innerText = '-';
-        mBtn.classList.add('disabled');
-        mBtn.onclick = null;
-      }
-    }
+    loadMoveButtons(activePlayerMon, useMoveGym);
 
     // Player UI refresh
     document.getElementById('player-name').innerText = activePlayerMon.nickname || activePlayerMon.apiData.name;
@@ -6179,7 +6111,7 @@ function renderTeamGrid() {
         ${reorderHtml}
         <div class="team-sprite-wrap">
           <img src="${mon.apiData.sprites?.other?.['official-artwork']?.front_default || mon.apiData.sprites.front_default}" alt="sprite" style="background:${typeBg};">
-          ${trainArrow}
+          ${trainLabel}
         </div>
         <div class="slot-name">${mon.nickname || mon.apiData.name} ${statusIcon}</div>
         <div class="slot-lvl">Lvl ${curLvl} | ${mon.currentHp}/${mon.maxHp} HP</div>
@@ -8455,7 +8387,16 @@ function updateTrainerLocationList(data) {
   listEl.appendChild(span);
 }
 
+let lastProfileOpen = 0;
+let lastSocketAction = 0;
+const SOCKET_COOLDOWN = 3000; // 3s between trade/pvp requests
+
 async function openTrainerProfile(userId) {
+  // Rate limit: 500ms between profile views
+  const now = Date.now();
+  if (now - lastProfileOpen < 500) return;
+  lastProfileOpen = now;
+
   const modal = document.getElementById('trainer-profile-modal');
   if (!modal) return;
   modal.style.display = 'flex';
@@ -8486,6 +8427,9 @@ async function openTrainerProfile(userId) {
       const tradeBtn = document.getElementById('btn-trainer-trade');
       const battleBtn = document.getElementById('btn-trainer-battle');
       tradeBtn.onclick = () => {
+        const now = Date.now();
+        if (now - lastSocketAction < SOCKET_COOLDOWN) { showToast('Слишком часто! Подождите...', true); return; }
+        lastSocketAction = now;
         modal.style.display = 'none';
         initTradeSocket();
         if (!socket || !socket.connected) {
@@ -8496,6 +8440,9 @@ async function openTrainerProfile(userId) {
         showToast('Запрос на обмен отправлен!', false);
       };
       battleBtn.onclick = () => {
+        const now = Date.now();
+        if (now - lastSocketAction < SOCKET_COOLDOWN) { showToast('Слишком часто! Подождите...', true); return; }
+        lastSocketAction = now;
         if (!myTeam.some(m => m.currentHp > 0)) { showToast('Нужен живой покемон!', true); return; }
         modal.style.display = 'none';
         initTradeSocket();
@@ -9085,6 +9032,9 @@ function renderTradePlayerList() {
     tradeBtn.className = 'trade-btn';
     tradeBtn.textContent = 'Трейд';
     tradeBtn.onclick = () => {
+      const now = Date.now();
+      if (now - lastSocketAction < SOCKET_COOLDOWN) { showToast('Слишком часто!', true); return; }
+      lastSocketAction = now;
       socket.emit('trade_request', p.id);
       tradeBtn.textContent = '✓';
       tradeBtn.disabled = true;
@@ -9097,6 +9047,9 @@ function renderTradePlayerList() {
     battleBtn.style.background = '#ff3b30';
     battleBtn.textContent = '⚔';
     battleBtn.onclick = () => {
+      const now = Date.now();
+      if (now - lastSocketAction < SOCKET_COOLDOWN) { showToast('Слишком часто!', true); return; }
+      lastSocketAction = now;
       if (myTeam.length === 0 || !myTeam.some(m => m.currentHp > 0)) {
         showToast('Нужен хотя бы один живой покемон!', true);
         return;
