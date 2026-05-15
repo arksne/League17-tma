@@ -7214,7 +7214,7 @@ function cloudSave() {
       const btnSync = document.getElementById('btn-cloud-sync');
       if (btnSync) { btnSync.textContent = '☁️✗'; setTimeout(() => { btnSync.textContent = '☁️ Авто'; }, 3000); }
     }
-  }, 3000);
+  }, 10000); // debounce 10s to avoid rate limits
 }
 
 async function cloudLoad() {
