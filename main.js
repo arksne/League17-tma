@@ -4765,37 +4765,33 @@ async function useMove(moveIndex) {
 }
 
 function handlePlayerFaint() {
-  if (battleType === 'wild') {
-    document.getElementById('battle-main-menu').style.display = 'none';
-    document.getElementById('battle-end-menu').style.display = 'flex';
+  // Try next mon regardless of battle type
+  const nextMon = myTeam.find(m => m.currentHp > 0 && m !== activePlayerMon);
+  if (nextMon) {
+    activePlayerMon = nextMon;
+    activePlayerMon.choiceLockedMove = undefined;
+    appendToLog(`${activePlayerMon.apiData.name}, вперёд!`);
+    document.getElementById('player-name').innerText = activePlayerMon.nickname || activePlayerMon.apiData.name;
+    document.getElementById('player-lvl').innerText = `Lv${activePlayerMon.baseLevel + activePlayerMon.candiesEaten}`;
+    const spriteUrl = activePlayerMon.apiData.sprites?.other?.['official-artwork']?.front_default || activePlayerMon.apiData.sprites.front_default;
+    document.getElementById('player-sprite').src = spriteUrl;
+    updateBattleSpriteBgs();
+    document.getElementById('player-status-icon').innerText = getStatusIcon(activePlayerMon.status);
+    updatePlayerHpUI();
+
+    // Load moves for new mon
+    const handler = battleType === 'wild' ? useMove : useMoveGym;
+    loadMoveButtons(activePlayerMon, handler);
+
+    saveBattleState();
+    setTimeout(() => { document.getElementById('battle-main-menu').style.display = 'flex'; }, 1000);
     autoSave();
   } else {
-    // Gym battle - try next mon
-    const nextMon = myTeam.find(m => m.currentHp > 0 && m !== activePlayerMon);
-    if (nextMon) {
-      activePlayerMon = nextMon;
-      activePlayerMon.choiceLockedMove = undefined;
-      appendToLog(`Go! ${activePlayerMon.apiData.name}!`);
-      document.getElementById('player-name').innerText = activePlayerMon.nickname || activePlayerMon.apiData.name;
-      document.getElementById('player-lvl').innerText = `Lv${activePlayerMon.baseLevel + activePlayerMon.candiesEaten}`;
-      const spriteUrl = activePlayerMon.apiData.sprites?.other?.['official-artwork']?.front_default || activePlayerMon.apiData.sprites.front_default;
-      document.getElementById('player-sprite').src = spriteUrl;
-      updateBattleSpriteBgs();
-      document.getElementById('player-status-icon').innerText = getStatusIcon(activePlayerMon.status);
-      updatePlayerHpUI();
-
-      // Load moves for new mon
-      const handler = battleType === 'wild' ? useMove : useMoveGym;
-      loadMoveButtons(activePlayerMon, handler);
-
-      setTimeout(() => { document.getElementById('battle-main-menu').style.display = 'flex'; }, 1000);
-      autoSave();
-    } else {
-      appendToLog('Вся команда потеряла сознание... Вы проиграли.');
-      document.getElementById('battle-main-menu').style.display = 'none';
-      document.getElementById('battle-end-menu').style.display = 'flex';
-      autoSave();
-    }
+    appendToLog('Вся команда потеряла сознание... Вы проиграли.');
+    document.getElementById('battle-main-menu').style.display = 'none';
+    document.getElementById('battle-end-menu').style.display = 'flex';
+    clearBattleState();
+    autoSave();
   }
 }
 
