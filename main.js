@@ -1354,10 +1354,23 @@ const NPC_DATA = {
 
 // Centralized inventory
 let inventory = {};
+let itemHistory = [];
+
+function logItemHistory(itemId, qty, source) {
+  itemHistory.push({
+    itemId, qty, source,
+    timestamp: Date.now(),
+    trainerId: getTrainerId()
+  });
+  if (itemHistory.length > 500) itemHistory = itemHistory.slice(-500);
+}
 
 function initInventory() {
   // Give infinite (9999) of every item for beta testing
-  ITEMS.forEach(item => { inventory[item.id] = 9999; });
+  ITEMS.forEach(item => {
+    inventory[item.id] = 9999;
+    logItemHistory(item.id, 9999, 'init');
+  });
 }
 
 // Дебаг: заполнить рюкзак всеми предметами x10 (вызови в консоли)
@@ -1390,6 +1403,7 @@ function addItem(itemId, qty = 1) {
     return false;
   }
   inventory[itemId] += qty;
+  logItemHistory(itemId, qty, 'add');
   checkNPCQuestProgress(itemId, qty);
   checkQuestProgress('collect_items', qty, itemId);
   updateInventoryDisplay();
@@ -1439,6 +1453,11 @@ const LEGENDARY_SET = new Set([
   'zacian', 'zamazenta', 'eternatus', 'kubfu', 'urshifu', 'regieleki', 'regidrago', 'glastrier', 'spectrier', 'calyrex',
   'koraidon', 'miraidon', 'ting-lu', 'chien-pao', 'wo-chien', 'chi-yu'
 ]);
+
+// --- UID SYSTEM ---
+let uidCounter = Date.now();
+function generateUID() { return (++uidCounter).toString(36) + Math.random().toString(36).substr(2, 6); }
+function getTrainerId() { return tgUser?.id || localStorage.getItem('league17_trainer_id') || '0'; }
 
 // BADGES (NEW)
 let badges = [];
@@ -2383,7 +2402,7 @@ function saveGame() {
     pokedexSeen: Array.from(pokedexSeen),
     pokedexCaught: Array.from(pokedexCaught),
     quests, questProgress, completedQuests, npcQuestProgress, completedNPCQuests,
-    visitedLocations: Array.from(visitedLocations), itemsUsedInBattle,
+    visitedLocations: Array.from(visitedLocations), itemsUsedInBattle, itemHistory,
     pcBoxes, daycareMons, daycareEgg, lastLocation, expShareActive,
   };
   try {
@@ -2438,6 +2457,7 @@ function loadGame() {
     completedNPCQuests = data.completedNPCQuests || [];
     visitedLocations = new Set(data.visitedLocations || []);
     itemsUsedInBattle = data.itemsUsedInBattle || 0;
+    itemHistory = data.itemHistory || [];
     pcBoxes = data.pcBoxes || [[]];
     daycareMons = data.daycareMons || [];
     daycareEgg = data.daycareEgg || null;
@@ -2542,6 +2562,10 @@ async function giveStarterMon(pokemonName) {
     const expToNext = Math.pow(baseLevel + 1, 3);
 
     const newMon = {
+      uid: generateUID(),
+      originalTrainer: getTrainerId(),
+      createdAt: Date.now(),
+      caughtLocation: currentLocationId,
       apiData: starterData,
       maxHp: 100,
       currentHp: 100,
@@ -4528,6 +4552,10 @@ function initEncounterEvents() {
           appendToLog(`Попался! ${activeWild.name.toUpperCase()} пойман!`, false, 'catch');
 
           const newMon = {
+            uid: generateUID(),
+            originalTrainer: getTrainerId(),
+            createdAt: Date.now(),
+            caughtLocation: currentLocationId,
             apiData: activeWild,
             maxHp: wildMaxHP,
             currentHp: wildCurHP,
@@ -6017,6 +6045,12 @@ function updateGenecodeDisplay_Profile(mon) {
   const vitStr = (mon.vitaminsEaten > 0) ? `.${mon.vitaminsEaten*10}` : '.0';
   const genecodeStr = `h${mon.ivs.hp}a${mon.ivs.atk}d${mon.ivs.def}s${mon.ivs.spe}sa${mon.ivs.spa}sd${mon.ivs.spd}${vitStr}${mon.breedLetter}`;
   document.getElementById('info-genecode').innerText = genecodeStr;
+  // Show UID & original trainer
+  const uidEl = document.getElementById('info-uid');
+  if (uidEl) {
+    uidEl.innerText = mon.uid || '?';
+    uidEl.title = mon.originalTrainer ? `Тренер ID: ${mon.originalTrainer}` : '';
+  }
 }
 
 function saveActiveMonData() {
@@ -6902,6 +6936,7 @@ async function authTelegram() {
     const data = await res.json();
     tgToken = data.token;
     tgUser = data.user;
+    localStorage.setItem('league17_trainer_id', String(tgUser.id));
     hideLoginScreen();
   } catch (e) {
     console.warn('Auth failed (offline?)', e);
@@ -8127,7 +8162,10 @@ function initTradeSocket() {
     }
 
     if (receivedOffer && receivedOffer.type === 'pokemon') {
-      receivedOffer.data.uid = Date.now().toString() + Math.random().toString(36).substr(2, 9);
+      receivedOffer.data.previousOwner = receivedOffer.data.originalTrainer;
+      receivedOffer.data.uid = generateUID();
+      receivedOffer.data.originalTrainer = getTrainerId();
+      receivedOffer.data.createdAt = Date.now();
       myTeam.push(receivedOffer.data);
     }
 
