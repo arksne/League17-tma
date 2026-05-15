@@ -2061,13 +2061,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
   }
 
-  // CRITICAL: if no valid pokemon, force give starter
-  if (!myTeam || myTeam.length === 0 || myTeam.every(m => !m || !m.apiData || !m.currentHp)) {
-    myTeam = [];
-    await giveStarter();
-    saveGame();
-  }
-
   renderLocation(currentLocationId);
   renderTeamGrid();
   updateInventoryDisplay();
@@ -2196,19 +2189,23 @@ document.addEventListener('DOMContentLoaded', async () => {
     setTimeout(() => cloudSave(), 2000);
   }
 
-  // Trainer profile modal close — use event delegation (always works)
-  document.addEventListener('click', (e) => {
-    // Close button
-    if (e.target.closest('#btn-close-trainer-profile')) {
-      const modal = document.getElementById('trainer-profile-modal');
-      if (modal) modal.style.display = 'none';
-      return;
-    }
-    // Overlay click
-    if (e.target.id === 'trainer-profile-modal') {
-      e.target.style.display = 'none';
-    }
-  });
+  // Trainer profile modal close
+  const btnCloseTrainer = document.getElementById('btn-close-trainer-profile');
+  if (btnCloseTrainer) {
+    btnCloseTrainer.addEventListener('click', () => {
+      document.getElementById('trainer-profile-modal').style.display = 'none';
+    });
+  }
+
+  // Click overlay to close trainer profile modal
+  const trainerModal = document.getElementById('trainer-profile-modal');
+  if (trainerModal) {
+    trainerModal.addEventListener('click', (e) => {
+      if (e.target === trainerModal) {
+        trainerModal.style.display = 'none';
+      }
+    });
+  }
 
   // Starter modal overlay click to close
   const starterModal = document.getElementById('starter-modal');
@@ -2850,16 +2847,10 @@ async function giveStarter() {
     div.addEventListener('mouseenter', () => div.style.transform = 'scale(1.05)');
     div.addEventListener('mouseleave', () => div.style.transform = 'scale(1)');
 
-    div.addEventListener('click', async () => {
+    div.addEventListener('click', () => {
       const chosenStarter = gen[Math.floor(Math.random() * gen.length)];
       modal.style.display = 'none';
-      await giveStarterMon(chosenStarter);
-      renderTeamGrid();
-      renderLocation(currentLocationId);
-      updateInventoryDisplay();
-      updateMoneyDisplay();
-      saveGame();
-      cloudSave();
+      giveStarterMon(chosenStarter);
       showToast(`Вам выпал покемон: ${chosenStarter.toUpperCase()}! (Gen ${idx + 1})`, false);
     });
     grid.appendChild(div);
@@ -7423,26 +7414,14 @@ async function authTelegram() {
     const data = await res.json();
     tgToken = data.token;
     tgUser = data.user;
-
-    // Detect account switch — clean old data to prevent mixing
-    const prevId = localStorage.getItem('league17_trainer_id');
-    if (prevId && String(tgUser.id) !== prevId) {
-      console.warn('[auth] Account switch detected:', prevId, '→', tgUser.id);
-      // Clear all old localStorage data for previous account
-      const keysToClear = ['save','save_ts','save_v','save_sync','save_corrupted','theme','quest_date','avatar','nickname_'];
-      const oldTrainer = prevId;
-      keysToClear.forEach(k => {
-        try { localStorage.removeItem(`league17_${k}_${oldTrainer}`); } catch(e) {}
-      });
-    }
     localStorage.setItem('league17_trainer_id', String(tgUser.id));
 
     hideLoginScreen();
 
-    // Registration: skip if user already has data (localStorage or server save)
-    const hasLocalData = localStorage.getItem(lsKey('save'));
-    if (!data.user.registered && !hasLocalData) {
+    // Check if registration needed — wait for it
+    if (!data.user.registered) {
       await showRegistrationScreen(data.user);
+      // Reload user data after registration
       tgUser.registered = 1;
     }
   } catch (e) {
@@ -7485,31 +7464,6 @@ async function doCloudSave(attempt = 0) {
     });
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const result = await res.json();
-
-    // Server rejected: data is stale — RELOAD from server immediately
-    if (!result.success && result.error === 'stale_save') {
-      console.warn('[sync] Server rejected save v' + saveVersion + ' (server has v' + result.serverVersion + '). Reloading...');
-      const cloudData = await cloudLoad();
-      if (cloudData) {
-        applyCloudSave(cloudData);
-        // Re-save reconciled state
-        saveGame();
-        // Refresh UI
-        renderLocation(currentLocationId);
-        renderTeamGrid();
-        updateInventoryDisplay();
-        updateMoneyDisplay();
-        updateBadgeDisplay();
-        renderTrainerCard();
-      }
-      return result;
-    }
-
-    // Success: sync version with server
-    if (result.serverVersion) {
-      saveVersion = result.serverVersion;
-      localStorage.setItem(lsKey('save_v'), String(saveVersion));
-    }
     lastCloudSync = Date.now();
     saveRetryCount = 0;
     localStorage.setItem(lsKey('save_sync'), String(lastCloudSync));
@@ -7546,16 +7500,10 @@ async function cloudLoad() {
 function applyCloudSave(data) {
   if (!data || !data.myTeam) return;
   const cloudV = data._v || 0;
-  // ALWAYS apply if server has more pokemon or more money (regardless of version)
-  const localTeamCount = myTeam.length;
-  const cloudTeamCount = data.myTeam.length;
-  const localMoney = money || 0;
-  const cloudMoney = data.money || 0;
-  const shouldApply = cloudV > saveVersion || cloudTeamCount > localTeamCount || cloudMoney > localMoney;
+  if (cloudV <= saveVersion) return; // Server is older or same — skip
 
-  if (!shouldApply && cloudV <= saveVersion) return;
-
-  console.log(`[sync] Applying server data (v${cloudV}, ${cloudTeamCount} mons, ${cloudMoney} money)`);
+  // Server has newer data — use it
+  console.log(`[sync] Server v${cloudV} > local v${saveVersion} — applying server data`);
   currentLocationId = data.currentLocationId || currentLocationId;
   currentRegion = data.currentRegion || currentRegion;
   if (data.inventory) inventory = { ...data.inventory };

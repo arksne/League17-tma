@@ -10,8 +10,8 @@ const __dirname = path.dirname(__filename);
 let db;
 
 export async function initDB() {
-  // Use /app/data for Railway volume persistence (volume mount), fallback to local ../data
-  const dataDir = process.env.RAILWAY_ENVIRONMENT ? '/app/data' : path.join(__dirname, '../data');
+  // Ensure the data directory exists (Railway doesn't auto-create it)
+  const dataDir = path.join(__dirname, '../data');
   mkdirSync(dataDir, { recursive: true });
 
   db = await open({

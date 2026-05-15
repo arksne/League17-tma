@@ -1,8 +1,0 @@
-dist/wiki_images/
-node_modules/
-data/
-.git/
-src/
-*.cjs
-scratch.py
-update_ui.py
