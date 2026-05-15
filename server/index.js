@@ -52,19 +52,24 @@ const __dirname = path.dirname(__filename);
 app.use(express.static(path.join(__dirname, '../dist')));
 
 // SPA fallback for all other non-API routes
-app.get('*', (req, res) => {
+app.use((req, res, next) => {
   if (!req.path.startsWith('/api')) {
     res.sendFile(path.join(__dirname, '../dist/index.html'));
+  } else {
+    next();
   }
 });
 
 const PORT = process.env.PORT || 3000;
+
+import { initSocket } from './socket.js';
 
 try {
   await initDB();
   const server = app.listen(PORT, () => {
     console.log(`League-17 TMA server running on port ${PORT}`);
   });
+  initSocket(server, allowedOrigin);
 
   process.on('SIGTERM', async () => {
     console.log('SIGTERM received, shutting down gracefully...');
