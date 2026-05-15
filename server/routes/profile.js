@@ -111,4 +111,29 @@ router.get('/profile/:userId', async (req, res) => {
   }
 });
 
+// Public: list all trainers
+router.get('/trainers/all', async (req, res) => {
+  try {
+    const db = getDB();
+    const users = await db.all('SELECT id, telegram_id, username, first_name, nickname, avatar, registered, created_at, registered_at FROM users ORDER BY id DESC');
+    for (const u of users) {
+      const save = await db.get('SELECT save_data, updated_at FROM game_saves WHERE user_id = ?', u.id);
+      const loc = await db.get('SELECT location_id, updated_at FROM user_locations WHERE user_id = ?', u.id);
+      if (save) {
+        try {
+          const data = JSON.parse(save.save_data);
+          u.badges = data.badges?.length || 0;
+          u.money = data.money || 0;
+          u.teamSize = (data.myTeam || []).length;
+          u.lastSave = save.updated_at;
+        } catch(e) { u.badges = 0; u.money = 0; u.teamSize = 0; }
+      }
+      u.lastLocation = loc?.location_id || null;
+      u.lastSeen = loc?.updated_at || u.lastSave || u.created_at;
+      u.region = u.lastLocation ? (u.lastLocation.includes('johto') ? 'Джото' : u.lastLocation.includes('selen') ? 'Селен' : 'Канто') : null;
+    }
+    res.json({ users });
+  } catch(e) { res.status(500).json({ error: 'Internal error' }); }
+});
+
 export default router;

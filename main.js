@@ -1528,7 +1528,7 @@ function initAdminPanel() {
     const select = document.getElementById('admin-user-select');
     if (select.options.length <= 1) {
       try {
-        const res = await fetch('/admin/users?token=league17admin2026');
+        const res = await fetch('/api/trainers/all');
         const data = await res.json();
         if (data.users) {
           data.users.forEach(u => {
@@ -2922,8 +2922,8 @@ function initAppNav() {
     'view-world': 'Мир',
     'view-backpack': 'Рюкзак',
     'view-team': 'Команда Покемонов',
-    'view-chat': 'Чат'
-
+    'view-chat': 'Чат',
+    'view-trainers': 'Тренеры'
   };
 
   navItems.forEach(item => {
@@ -2947,6 +2947,10 @@ function initAppNav() {
         renderTeamGrid();
         document.getElementById('team-roster').style.display = 'block';
         document.getElementById('pokedex-display').style.display = 'none';
+      }
+
+      if (targetId === 'view-trainers') {
+        loadAllTrainers();
       }
 
       if (targetId === 'view-chat') {
@@ -8279,7 +8283,7 @@ async function loadAllTrainers() {
   if (!listEl) return;
   listEl.innerHTML = '<div style="text-align:center;color:var(--tma-text-muted);padding:20px;">Загрузка...</div>';
   try {
-    const res = await fetch('/admin/users?token=league17admin2026');
+    const res = await fetch('/api/trainers/all');
     const data = await res.json();
     trainersAllData = data.users || [];
     if (trainersAllData.length === 0) {
