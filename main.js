@@ -7980,14 +7980,13 @@ function renderTrainerCard() {
   const moneyEl = document.getElementById('trainer-money');
   const badgesEl = document.getElementById('trainer-badges');
   const caughtEl = document.getElementById('trainer-caught');
-  const teamEl = document.getElementById('trainer-team');
 
   if (trainerNickname) {
-    nameEl.innerText = trainerNickname;
+    nameEl.textContent = trainerNickname;
   } else if (tgUser) {
-    nameEl.innerText = tgUser.first_name || tgUser.username || `ID:${tgUser.id}`;
+    nameEl.textContent = tgUser.first_name || tgUser.username || `ID:${tgUser.id}`;
   } else {
-    nameEl.innerText = 'Загрузка...';
+    nameEl.textContent = '---';
   }
   nameEl.style.cursor = 'pointer';
   nameEl.title = 'Нажмите чтобы изменить прозвище';
@@ -7999,35 +7998,12 @@ function renderTrainerCard() {
     });
   };
 
-  moneyEl.innerText = `¥${money}`;
-  badgesEl.innerText = badges.length;
-  caughtEl.innerText = `${pokedexCaught.size}/151`;
+  moneyEl.textContent = `¥${money}`;
+  badgesEl.textContent = badges.length;
+  caughtEl.textContent = `${pokedexCaught.size}/151`;
 
-  if (!myTeam || myTeam.length === 0) {
-    teamEl.innerHTML = '<div class="trainer-team-empty">Нет покемонов</div>';
-    return;
-  }
-
-  teamEl.innerHTML = '';
-  myTeam.forEach(mon => {
-    const div = document.createElement('div');
-    div.className = 'trainer-team-mon';
-    const lvl = mon.baseLevel + (mon.candiesEaten || 0);
-    const spriteUrl = mon.apiData?.sprites?.other?.['official-artwork']?.front_default || mon.apiData?.sprites?.front_default || '';
-    const typeBg = mon.apiData?.types ? getTypeGradient(mon.apiData.types) : '';
-    div.innerHTML = `
-      <div class="trainer-team-mon-img-box" style="background:${typeBg};">
-        <img class="trainer-team-mon-img" src="${spriteUrl}" alt="">
-      </div>
-      <div class="trainer-team-mon-info">
-        <div class="trainer-team-mon-name">${mon.nickname || mon.apiData.name}</div>
-        <div class="trainer-team-mon-lvl">Lv${lvl}</div>
-      </div>`;
-    teamEl.appendChild(div);
-  });
-
-  // Load trainers at location
   loadLocationTrainers();
+  renderOnlinePlayers();
 }
 
 // ================================================================
@@ -8053,40 +8029,51 @@ async function loadLocationTrainers() {
   try {
     const res = await fetch(`${API_BASE}/profile/trainers?locationId=${encodeURIComponent(currentLocationId)}`);
     const data = await res.json();
+    listEl.innerHTML = '';
     if (!data.trainers || data.trainers.length === 0) {
-      listEl.innerHTML = '<div class="trainer-location-trainer" style="color:#4a6a7a;cursor:default;">Никого нет</div>';
+      listEl.textContent = 'никого';
       return;
     }
-    listEl.innerHTML = '';
-    data.trainers.forEach(t => {
-      const div = document.createElement('div');
-      div.className = 'trainer-location-trainer';
-      const name = t.first_name || t.username || `Trainer#${t.id}`;
-      div.innerText = name;
-      div.addEventListener('click', () => openTrainerProfile(t.id));
-      listEl.appendChild(div);
+    data.trainers.forEach((t, i) => {
+      const span = document.createElement('span');
+      span.className = 'chat-trainer-chip';
+      span.textContent = t.first_name || t.username || `T${t.id}`;
+      span.addEventListener('click', () => openTrainerProfile(t.id));
+      listEl.appendChild(span);
     });
-  } catch (e) {
-    listEl.innerHTML = '<div style="color:#4a6a7a;">Ошибка загрузки</div>';
+  } catch (e) { listEl.textContent = '---'; }
+}
+
+function renderOnlinePlayers() {
+  const listEl = document.getElementById('chat-online-list');
+  if (!listEl) return;
+  listEl.innerHTML = '';
+  if (onlinePlayersList.length === 0) {
+    listEl.textContent = 'никого';
+    return;
   }
+  onlinePlayersList.forEach((p, i) => {
+    const span = document.createElement('span');
+    span.className = 'chat-trainer-chip';
+    span.textContent = p.username || 'Тренер';
+    span.addEventListener('click', () => openTrainerProfile(p.userId));
+    listEl.appendChild(span);
+  });
 }
 
 function updateTrainerLocationList(data) {
   const listEl = document.getElementById('trainer-location-list');
   if (!listEl || !data) return;
-  // Remove empty-state message if present
-  const emptyMsg = listEl.querySelector('.trainer-location-trainer[style]');
-  if (emptyMsg) emptyMsg.remove();
-  // Avoid duplicates
+  if (data.userId === (tgUser?.id || 0)) return;
   const existing = listEl.querySelector(`[data-trainer-id="${data.userId}"]`);
   if (existing) return;
-  const div = document.createElement('div');
-  div.className = 'trainer-location-trainer';
-  div.setAttribute('data-trainer-id', data.userId);
-  const name = data.firstName || data.username || `Trainer#${data.userId}`;
-  div.innerText = name;
-  div.addEventListener('click', () => openTrainerProfile(data.userId));
-  listEl.appendChild(div);
+  if (listEl.textContent === 'никого' || listEl.textContent === '---') listEl.textContent = '';
+  const span = document.createElement('span');
+  span.className = 'chat-trainer-chip';
+  span.setAttribute('data-trainer-id', data.userId);
+  span.textContent = data.firstName || data.username || `T${data.userId}`;
+  span.addEventListener('click', () => openTrainerProfile(data.userId));
+  listEl.appendChild(span);
 }
 
 async function openTrainerProfile(userId) {

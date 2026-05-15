@@ -294,55 +294,28 @@
         </div>
 
         <!-- ======================= -->
-        <!-- VIEW 5: CHAT + TRAINER CARD -->
+        <!-- VIEW 5: CHAT -->
         <!-- ======================= -->
         <div id="view-chat" class="app-view">
           <div class="chat-layout">
-
-            <!-- LEFT: CHAT -->
-            <div class="chat-panel">
-              <div class="chat-header">Общий чат</div>
-              <div class="chat-messages" id="chat-messages">
-                <div class="chat-loading">Загрузка сообщений...</div>
-              </div>
-              <div class="chat-input-area">
-                <input class="chat-input" id="chat-input" type="text" placeholder="Введите сообщение..." maxlength="500">
-                <button class="chat-send-btn" id="chat-send-btn">Отпр.</button>
-              </div>
+            <div class="chat-top-bar">
+              <span class="chat-my-name" id="trainer-name">---</span>
+              <span class="chat-my-stat">💰<span id="trainer-money">0</span></span>
+              <span class="chat-my-stat">🏅<span id="trainer-badges">0</span></span>
+              <span class="chat-my-stat">🐾<span id="trainer-caught">0</span></span>
             </div>
-
-            <!-- RIGHT: TRAINER CARD -->
-            <div class="trainer-card">
-              <div class="trainer-card-header">
-                <div class="trainer-avatar" id="trainer-avatar">👤</div>
-                <div class="trainer-name" id="trainer-name">Загрузка...</div>
-              </div>
-              <div class="trainer-stats">
-                <div class="trainer-stat">
-                  <span class="trainer-stat-label">Кредиты</span>
-                  <span class="trainer-stat-value" id="trainer-money">¥500</span>
-                </div>
-                <div class="trainer-stat">
-                  <span class="trainer-stat-label">Значки</span>
-                  <span class="trainer-stat-value" id="trainer-badges">0</span>
-                </div>
-                <div class="trainer-stat">
-                  <span class="trainer-stat-label">Поймано</span>
-                  <span class="trainer-stat-value" id="trainer-caught">0/151</span>
-                </div>
-              </div>
-
-              <div class="trainer-location-trainers" id="trainer-location-trainers">
-                <div class="trainer-location-label">Тренеры на локации:</div>
-                <div class="trainer-location-list" id="trainer-location-list">Загрузка...</div>
-              </div>
-
-              <div class="trainer-team-label">Команда</div>
-              <div class="trainer-team" id="trainer-team">
-                <div class="trainer-team-empty">Нет покемонов</div>
-              </div>
+            <div class="chat-trainers-bar">
+              <span class="chat-trainers-label">📍</span><span id="trainer-location-list" class="chat-trainers-list">---</span>
+              <span class="chat-trainers-sep">|</span>
+              <span class="chat-trainers-label">🌐</span><span id="chat-online-list" class="chat-trainers-list">---</span>
             </div>
-
+            <div class="chat-messages" id="chat-messages">
+              <div class="chat-loading">Загрузка...</div>
+            </div>
+            <div class="chat-input-area">
+              <input class="chat-input" id="chat-input" type="text" placeholder="Сообщение..." maxlength="500" autocomplete="off">
+              <button class="chat-send-btn" id="chat-send-btn">📨</button>
+            </div>
           </div>
         </div>
 
