@@ -2255,14 +2255,9 @@ document.addEventListener('DOMContentLoaded', async () => {
   // Restore battle if one was in progress before page refresh
   restoreBattleState();
 
-  // Restore hunt toggle state
-  if (localStorage.getItem(lsKey('hunt_active')) === '1') {
-    const enc = getLocationEncounters();
-    if (enc.length > 0 && myTeam.some(m => m.currentHp > 0)) {
-      startAutoHunt();
-    } else {
-      try { localStorage.removeItem(lsKey('hunt_active')); } catch(_) {}
-    }
+  // Restore hunt toggle state — always restart, tick handles empty locations
+  if (localStorage.getItem(lsKey('hunt_active')) === '1' && myTeam.some(m => m.currentHp > 0)) {
+    startAutoHunt();
   }
 
   initInventoryEvents();
@@ -3520,10 +3515,7 @@ function renderLocation(locId) {
     });
   }
 
-  // Hunt button is now global (header). If location has no encounters, stop hunt.
-  if (huntEncounters.length === 0 && huntActive) {
-    stopAutoHunt();
-  }
+  // Hunt persists across locations — tick handles empty encounter tables
 
   // NPC panel
   const npcPanel = document.getElementById('npc-panel');

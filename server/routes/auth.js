@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { verifyTelegramInitData } from '../auth.js';
+import { verifyTelegramInitData, parseTestUser } from '../auth.js';
 import { getDB } from '../db.js';
 import { generateToken, authMiddleware } from '../middleware/auth.js';
 import fs from 'fs';
