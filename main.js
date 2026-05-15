@@ -1352,6 +1352,25 @@ const NPC_DATA = {
     },
     quests: [],
   },
+
+  // Tutorial NPC at starting location
+  'professor_tutorial': {
+    id: 'professor_tutorial', name: 'Профессор Оук', sprite: '👨‍🔬', location: 'pallet_town',
+    dialog: {
+      greet: 'Здравствуй, юный тренер! Добро пожаловать в мир Покематрицы! Я помогу тебе освоиться.',
+      default: 'Возвращайся когда выполнишь текущее задание. Удачи!',
+      quest_offer: 'Я подготовил для тебя обучающий курс из 5 шагов. Готов начать?',
+      quest_incomplete: 'Ты ещё не выполнил задание. Продолжай стараться!',
+      quest_complete: 'Отлично! Вот твоя награда. Готов к следующему шагу?',
+    },
+    quests: [
+      { id: 'tutorial_1', type: 'catch_x', targetItem: null, targetQty: 3, desc: 'Поймайте 3 диких покемона', rewardMoney: 500, rewardItem: 'pokeball', rewardQty: 5, prereqQuest: null },
+      { id: 'tutorial_2', type: 'defeat_x', targetItem: null, targetQty: 5, desc: 'Победите 5 диких покемонов', rewardMoney: 600, rewardItem: 'potion', rewardQty: 3, prereqQuest: 'tutorial_1' },
+      { id: 'tutorial_3', type: 'use_item', targetItem: null, targetQty: 2, desc: 'Используйте 2 предмета в бою', rewardMoney: 400, rewardItem: 'candy', rewardQty: 2, prereqQuest: 'tutorial_2' },
+      { id: 'tutorial_4', type: 'explore', targetItem: null, targetQty: 3, desc: 'Посетите 3 разных локации', rewardMoney: 500, rewardItem: 'superPotion', rewardQty: 2, prereqQuest: 'tutorial_3' },
+      { id: 'tutorial_5', type: 'earn_money', targetItem: null, targetQty: 2000, desc: 'Заработайте $2000', rewardMoney: 1000, rewardItem: 'greatBall', rewardQty: 5, prereqQuest: 'tutorial_4' },
+    ],
+  },
 };
 
 // Centralized inventory
@@ -2279,6 +2298,7 @@ let questProgress = {};
 let completedQuests = [];
 let npcQuestProgress = {};
 let completedNPCQuests = [];
+let tutorialStep = 0; // 0=not started, 1-5=tutorial chain
 let visitedLocations = new Set();
 let itemsUsedInBattle = 0;
 
@@ -2948,6 +2968,33 @@ function renderPCSlots(view) {
     const boxIdx = parseInt(view);
     const box = pcBoxes[boxIdx];
     if (!box) return;
+
+    // Show eggs in this box
+    const boxEggs = eggs.filter(e => e.boxIdx === boxIdx && !e.inTeam);
+    boxEggs.forEach(egg => {
+      const div = document.createElement('div');
+      div.className = 'pc-slot';
+      div.style.background = 'rgba(255,215,0,0.1)';
+      div.style.borderColor = '#ffd700';
+      const remaining = Math.max(0, Math.ceil((egg.readyTime - Date.now()) / (24*60*60*1000)));
+      const remainingText = remaining > 0 ? `~${remaining} дн` : 'Готово!';
+      div.innerHTML = `
+        <span style="font-size:32px;">🥚</span>
+        <div class="pc-slot-info">
+          <b>Яйцо ${egg.species ? `(${egg.species})` : ''}</b>
+          <span style="color:#ffd700;">${remainingText}</span>
+        </div>
+        <div class="pc-slot-actions">
+          <button class="btn-use" style="background:#ff9500;padding:4px 10px;">Забрать</button>
+        </div>
+      `;
+      div.querySelector('button').onclick = () => {
+        collectEgg(egg.uid);
+        openPC();
+      };
+      container.appendChild(div);
+    });
+
     box.forEach((mon, i) => {
       const div = document.createElement('div');
       div.className = 'pc-slot';
@@ -3129,7 +3176,7 @@ function getFullSaveData() {
     currentPokemonIndex,
     pokedexSeen: Array.from(pokedexSeen),
     pokedexCaught: Array.from(pokedexCaught),
-    quests, questProgress, completedQuests, npcQuestProgress, completedNPCQuests,
+    quests, questProgress, completedQuests, npcQuestProgress, completedNPCQuests, tutorialStep,
     visitedLocations: Array.from(visitedLocations), itemsUsedInBattle, itemHistory,
     pcBoxes: pcBoxes.map(box => box.map(m => ({
       uid: m.uid, originalTrainer: m.originalTrainer, createdAt: m.createdAt,
@@ -3261,6 +3308,7 @@ function loadGame() {
     completedQuests = data.completedQuests || [];
     npcQuestProgress = data.npcQuestProgress || {};
     completedNPCQuests = data.completedNPCQuests || [];
+    tutorialStep = data.tutorialStep || 0;
     visitedLocations = new Set(data.visitedLocations || []);
     itemsUsedInBattle = data.itemsUsedInBattle || 0;
     itemHistory = data.itemHistory || [];
@@ -3648,13 +3696,27 @@ function renderNPCQuests(npc) {
     } else if (isReady) {
       btn.innerText = 'Сдать';
       btn.onclick = () => {
-        for (let i = 0; i < q.targetQty; i++) removeItem(q.targetItem, 1);
-        completedNPCQuests.push(q.id);
-        delete npcQuestProgress[q.id];
-        money += q.rewardMoney;
-        addItem(q.rewardItem, q.rewardQty);
+        // Tutorial quests: advance to next step
+        if (q.id.startsWith('tutorial_')) {
+          const step = parseInt(q.id.split('_')[1]);
+          if (step === tutorialStep) {
+            tutorialStep++;
+            completedNPCQuests.push(q.id);
+            delete npcQuestProgress[q.id];
+            money += q.rewardMoney;
+            addItem(q.rewardItem, q.rewardQty);
+            addNotification('🎓 Обучение', `Шаг ${step} завершён! Награда: ${q.rewardMoney}💰 + ${q.rewardQty}x ${itemDef(q.rewardItem).nameRu}`);
+            appendToLog(`Обучающий квест (шаг ${step}) выполнен!`, false, 'quest');
+          }
+        } else {
+          for (let i = 0; i < q.targetQty; i++) removeItem(q.targetItem, 1);
+          completedNPCQuests.push(q.id);
+          delete npcQuestProgress[q.id];
+          money += q.rewardMoney;
+          addItem(q.rewardItem, q.rewardQty);
+          appendToLog(`Квест "${q.desc}" выполнен!`, false, 'quest');
+        }
         document.getElementById('npc-dialog').innerText = npc.dialog.quest_complete;
-        appendToLog(`Квест "${q.desc}" выполнен!`, false, 'quest');
         updateMoneyDisplay();
         renderNPCQuests(npc);
         autoSave();
@@ -3667,6 +3729,22 @@ function renderNPCQuests(npc) {
     el.appendChild(btn);
     container.appendChild(el);
   });
+}
+
+function checkTutorialProgress(type, amount, itemId) {
+  if (tutorialStep < 1 || tutorialStep > 5) return;
+  const questId = `tutorial_${tutorialStep}`;
+  if (completedNPCQuests.includes(questId)) return;
+  // Track progress for current tutorial step
+  const quest = NPC_DATA['professor_tutorial']?.quests?.find(q => q.id === questId);
+  if (!quest || quest.type !== type) return;
+  if (!(questId in npcQuestProgress)) npcQuestProgress[questId] = 0;
+  npcQuestProgress[questId] += amount;
+  if (npcQuestProgress[questId] >= quest.targetQty) {
+    npcQuestProgress[questId] = quest.targetQty;
+    addNotification('📋 Квест!', `Обучающий квест (шаг ${tutorialStep}): задание выполнено! Вернитесь к Профессору Оуку.`);
+  }
+  autoSave();
 }
 
 function checkNPCQuestProgress(itemId, qty) {
@@ -4181,6 +4259,8 @@ function checkQuestProgress(type, amount, itemId) {
       }
     }
   });
+  // Also track tutorial quests
+  checkTutorialProgress(type, amount, itemId);
 }
 
 function claimQuestReward(questId) {
@@ -5721,10 +5801,12 @@ function initEncounterEvents() {
     battleRound = 0;
     wildMovesPP = null;
     if (activePlayerMon) activePlayerMon.choiceLockedMove = undefined;
-    // Clear all team stat stages and volatile status after battle
+    // Clear all team stat stages, status effects, and battle state after battle
     myTeam.forEach(m => {
       m.statStages = { atk: 0, def: 0, spa: 0, spd: 0, spe: 0 };
       m.choiceLockedMove = undefined;
+      m.status = null;
+      m.sleepTurns = 0;
     });
     // Clear stat badges
     document.getElementById('player-stat-badges').innerHTML = '';
@@ -8074,6 +8156,7 @@ function applyCloudSave(data) {
   completedQuests = data.completedQuests || completedQuests;
   npcQuestProgress = data.npcQuestProgress || npcQuestProgress;
   completedNPCQuests = data.completedNPCQuests || completedNPCQuests;
+  tutorialStep = data.tutorialStep || tutorialStep;
   visitedLocations = new Set(data.visitedLocations || []);
   itemsUsedInBattle = data.itemsUsedInBattle || itemsUsedInBattle;
   itemHistory = data.itemHistory || itemHistory;
