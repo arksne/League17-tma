@@ -2525,94 +2525,23 @@ function craftItem(recipeId) {
   openCrafting();
 }
 
-const SAVE_VERSION = 2;
-
-// Ensure every pokemon object has all required fields
-function sanitizePokemon(mon) {
-  if (!mon || !mon.apiData) return mon;
-  const lvl = mon.baseLevel || 5;
-  mon.uid = mon.uid || (Date.now().toString(36) + Math.random().toString(36).substr(2, 6));
-  mon.originalTrainer = mon.originalTrainer || getTrainerId();
-  mon.createdAt = mon.createdAt || Date.now();
-  mon.caughtLocation = mon.caughtLocation || currentLocationId || 'unknown';
-  mon.maxHp = mon.maxHp || 50;
-  mon.currentHp = mon.currentHp ?? mon.maxHp;
-  mon.ivs = mon.ivs || { hp: 15, atk: 15, def: 15, spa: 15, spd: 15, spe: 15 };
-  mon.evs = mon.evs || { hp: 0, atk: 0, def: 0, spa: 0, spd: 0, spe: 0 };
-  mon.baseLevel = mon.baseLevel || 5;
-  mon.exp = mon.exp || 0;
-  mon.expToNext = mon.expToNext || Math.pow(mon.baseLevel + 1, 3);
-  mon.candiesEaten = mon.candiesEaten || 0;
-  mon.vitaminsEaten = mon.vitaminsEaten || 0;
-  mon.happiness = mon.happiness ?? 70;
-  mon.natureIdx = mon.natureIdx ?? 0;
-  mon.breedLetter = mon.breedLetter || 'A';
-  mon.status = mon.status || null;
-  mon.sleepTurns = mon.sleepTurns || 0;
-  mon.movesPP = mon.movesPP || [];
-  mon.statStages = mon.statStages || { atk: 0, def: 0, spa: 0, spd: 0, spe: 0 };
-  mon.abilityName = mon.abilityName || mon.apiData?.abilities?.[0]?.ability?.name || null;
-  mon.heldItem = mon.heldItem || null;
-  mon.berries = mon.berries || { sitrusBerry: 0, oranBerry: 0, lumBerry: 0, chestoBerry: 0, rawstBerry: 0 };
-  mon.learnableMoves = mon.learnableMoves || [];
-  mon.trainingStage = mon.trainingStage || 0;
-  mon.trainingStat = mon.trainingStat || null;
-  mon.nickname = mon.nickname || null;
-  return mon;
-}
-
 function saveGame() {
   const saveData = {
-    version: SAVE_VERSION,
     currentLocationId, currentRegion,
     inventory: { ...inventory },
     money, badges, trainerNickname,
-    myTeam: myTeam.map(m => sanitizePokemon(m)),
+    myTeam,
     currentPokemonIndex,
     pokedexSeen: Array.from(pokedexSeen),
     pokedexCaught: Array.from(pokedexCaught),
     quests, questProgress, completedQuests, npcQuestProgress, completedNPCQuests,
     visitedLocations: Array.from(visitedLocations), itemsUsedInBattle, itemHistory,
-    pcBoxes: pcBoxes.map(box => box.map(m => sanitizePokemon(m))),
-    daycareMons: daycareMons.map(e => ({ ...e, mon: sanitizePokemon(e.mon) })),
-    daycareEgg, lastLocation, expShareActive,
-    savedAt: Date.now(),
+    pcBoxes, daycareMons, daycareEgg, lastLocation, expShareActive,
   };
   try {
     localStorage.setItem(lsKey('save'), JSON.stringify(saveData));
-    saveGame.lastSaved = Date.now();
   } catch (e) {
     console.warn('Save failed (storage full?)', e);
-    // Try to save without boxes (less critical data)
-    try {
-      const minimal = { ...saveData, pcBoxes: [[]], itemHistory: [] };
-      localStorage.setItem(lsKey('save'), JSON.stringify(minimal));
-      saveGame.lastSaved = Date.now();
-    } catch(e2) { console.error('Minimal save also failed', e2); }
-  }
-}
-
-// Migrate old-format inventory to new format
-function migrateInventory(data) {
-  if (data.inventory) {
-    inventory = { ...data.inventory };
-    // Ensure all ITEMS keys exist
-    ITEMS.forEach(item => { if (!(item.id in inventory)) inventory[item.id] = 0; });
-    return;
-  }
-  // Old format: migrate individual inv* fields
-  initInventory();
-  const OLD_MAP = {
-    invPokeballs: 'pokeball', invGreatBall: 'greatBall', invUltraBall: 'ultraBall',
-    invPotion: 'potion', invCandy: 'candy', invVitamin: 'vitamin',
-    invTrain: 'train', invWeaken: 'weaken',
-    invSuperPotion: 'superPotion', invFullRestore: 'fullRestore',
-    invEvolutionStone: 'evolutionStone', invTM: 'tm',
-    invSitrusBerry: 'sitrusBerry', invOranBerry: 'oranBerry',
-    invLumBerry: 'lumBerry', invChestoBerry: 'chestoBerry', invRawstBerry: 'rawstBerry',
-  };
-  for (const [oldKey, newKey] of Object.entries(OLD_MAP)) {
-    if (data[oldKey] !== undefined) inventory[newKey] = data[oldKey];
   }
 }
 
@@ -2622,21 +2551,36 @@ function loadGame() {
     if (!raw) return false;
     const data = JSON.parse(raw);
 
-    // Version migration
-    if (!data.version || data.version < 2) {
-      data.myTeam = (data.myTeam || []).map(m => sanitizePokemon(m));
-      data.pcBoxes = (data.pcBoxes || [[]]).map(box => box.map(m => sanitizePokemon(m)));
-    }
-
     currentLocationId = data.currentLocationId || 'pallet_town';
     currentRegion = data.currentRegion || 'kanto';
-    migrateInventory(data);
+
+    // Load inventory — with migration from old format
+    if (data.inventory) {
+      inventory = { ...data.inventory };
+    } else {
+      // Old format: migrate individual fields
+      const OLD_MAP = {
+        invPokeballs: 'pokeball', invGreatBall: 'greatBall', invUltraBall: 'ultraBall',
+        invPotion: 'potion', invCandy: 'candy', invVitamin: 'vitamin',
+        invTrain: 'train', invWeaken: 'weaken',
+        invSuperPotion: 'superPotion', invFullRestore: 'fullRestore',
+        invEvolutionStone: 'evolutionStone', invTM: 'tm',
+        invSitrusBerry: 'sitrusBerry', invOranBerry: 'oranBerry',
+        invLumBerry: 'lumBerry', invChestoBerry: 'chestoBerry', invRawstBerry: 'rawstBerry',
+      };
+      initInventory();
+      for (const [oldKey, newKey] of Object.entries(OLD_MAP)) {
+        if (data[oldKey] !== undefined) inventory[newKey] = data[oldKey];
+      }
+    }
+    // Ensure all ITEMS keys exist
+    ITEMS.forEach(item => { if (!(item.id in inventory)) inventory[item.id] = 0; });
     syncOldInventory();
     money = data.money ?? 500;
     badges = data.badges || [];
     trainerNickname = data.trainerNickname || '';
-    myTeam = (data.myTeam || []).map(m => sanitizePokemon(m));
-    currentPokemonIndex = data.currentPokemonIndex ?? (myTeam.length > 0 ? 0 : null);
+    myTeam = data.myTeam || [];
+    currentPokemonIndex = data.currentPokemonIndex ?? null;
     pokedexSeen = new Set(data.pokedexSeen || []);
     pokedexCaught = new Set(data.pokedexCaught || []);
     quests = data.quests || [];
@@ -2647,26 +2591,17 @@ function loadGame() {
     visitedLocations = new Set(data.visitedLocations || []);
     itemsUsedInBattle = data.itemsUsedInBattle || 0;
     itemHistory = data.itemHistory || [];
-    pcBoxes = (data.pcBoxes || [[]]).map(box => box.map(m => sanitizePokemon(m)));
-    daycareMons = (data.daycareMons || []).map(e => ({ ...e, mon: sanitizePokemon(e.mon), depositTime: e.depositTime || Date.now() }));
+    pcBoxes = data.pcBoxes || [[]];
+    daycareMons = data.daycareMons || [];
     daycareEgg = data.daycareEgg || null;
     lastLocation = data.lastLocation || null;
     expShareActive = data.expShareActive || false;
-
-    // Validate: if team empty but had pokemon, fix
-    if (myTeam.length === 0 && data.myTeam && data.myTeam.length > 0) {
-      console.warn('Load: team was lost during sanitize, restoring originals');
-      myTeam = data.myTeam;
-    }
+    // Rehydrate daycare mon methods
+    daycareMons.forEach(e => { if (!e.mon.currentHp) e.mon.currentHp = e.mon.maxHp || 50; });
 
     return true;
   } catch (e) {
-    console.error('Load failed', e);
-    // Try to recover: backup the corrupted save
-    try {
-      const raw = localStorage.getItem(lsKey('save'));
-      if (raw) localStorage.setItem(lsKey('save') + '_backup_' + Date.now(), raw);
-    } catch(_) {}
+    console.warn('Load failed', e);
     return false;
   }
 }
@@ -7186,20 +7121,18 @@ function cloudSave() {
   cloudSaveTimer = setTimeout(async () => {
     try {
       const saveData = {
-        version: SAVE_VERSION,
         currentLocationId, currentRegion,
         inventory: { ...inventory },
-        money, badges, trainerNickname,
-        myTeam: myTeam.map(m => sanitizePokemon(m)),
+        money, badges,
+        myTeam,
         currentPokemonIndex,
         pokedexSeen: Array.from(pokedexSeen),
         pokedexCaught: Array.from(pokedexCaught),
-        pcBoxes: pcBoxes.map(box => box.map(m => sanitizePokemon(m))),
+        pcBoxes,
         npcQuestProgress, completedNPCQuests,
         quests, questProgress, completedQuests,
         visitedLocations: Array.from(visitedLocations),
         daycareMons, daycareEgg, lastLocation,
-        expShareActive, itemsUsedInBattle, itemHistory,
       };
       const lb = getLeaderboardData();
       await fetch(`${API_BASE}/save`, {
@@ -7214,7 +7147,7 @@ function cloudSave() {
       const btnSync = document.getElementById('btn-cloud-sync');
       if (btnSync) { btnSync.textContent = '☁️✗'; setTimeout(() => { btnSync.textContent = '☁️ Авто'; }, 3000); }
     }
-  }, 10000); // debounce 10s to avoid rate limits
+  }, 3000);
 }
 
 async function cloudLoad() {
@@ -7234,29 +7167,40 @@ async function cloudLoad() {
 
 function applyCloudSave(data) {
   if (!data || !data.myTeam) return;
+  let merged = false;
   const localTeamLen = myTeam.length;
-  const cloudTeamLen = (data.myTeam || []).length;
-  const localScore = badges.length * 100 + localTeamLen * 10 + Math.floor(money / 1000);
-  const cloudScore = (data.badges || []).length * 100 + cloudTeamLen * 10 + Math.floor((data.money || 0) / 1000);
-  const cloudIsNewer = data.savedAt && data.savedAt > (saveGame.lastSaved || 0);
+  const cloudTeamLen = data.myTeam.length;
 
-  // Use cloud if: newer AND (has better score OR is larger team)
-  if (cloudIsNewer || (cloudScore > localScore && cloudTeamLen >= localTeamLen)) {
+  if (cloudTeamLen > localTeamLen) {
     currentLocationId = data.currentLocationId || currentLocationId;
-    currentRegion = data.currentRegion || currentRegion;
-    myTeam = (data.myTeam || []).map(m => sanitizePokemon(m));
-    currentPokemonIndex = data.currentPokemonIndex ?? (myTeam.length > 0 ? 0 : null);
-    migrateInventory(data);
+    myTeam = data.myTeam;
+    currentPokemonIndex = data.currentPokemonIndex ?? currentPokemonIndex;
+
+    // Migrate inventory from cloud — handle both old and new format
+    if (data.inventory) {
+      inventory = { ...data.inventory };
+    } else {
+      // Old format: migrate individual fields
+      const OLD_MAP = {
+        invPokeballs: 'pokeball', invGreatBall: 'greatBall', invUltraBall: 'ultraBall',
+        invPotion: 'potion', invCandy: 'candy', invVitamin: 'vitamin',
+        invTrain: 'train', invWeaken: 'weaken',
+        invSuperPotion: 'superPotion', invFullRestore: 'fullRestore',
+        invEvolutionStone: 'evolutionStone', invTM: 'tm',
+      };
+      for (const [oldKey, newKey] of Object.entries(OLD_MAP)) {
+        if (data[oldKey] !== undefined) inventory[newKey] = data[oldKey];
+      }
+    }
+    // Ensure all ITEMS keys exist
+    ITEMS.forEach(item => { if (!(item.id in inventory)) inventory[item.id] = 0; });
     syncOldInventory();
+
     money = data.money ?? money;
     badges = data.badges || badges;
-    trainerNickname = data.trainerNickname || trainerNickname;
-    if (data.pcBoxes) pcBoxes = data.pcBoxes.map(box => box.map(m => sanitizePokemon(m)));
+    if (data.pcBoxes) pcBoxes = data.pcBoxes;
     if (data.lastLocation) lastLocation = data.lastLocation;
-    if (data.expShareActive !== undefined) expShareActive = data.expShareActive;
-    if (data.itemsUsedInBattle !== undefined) itemsUsedInBattle = data.itemsUsedInBattle;
-    if (data.daycareMons) daycareMons = data.daycareMons.map(e => ({ ...e, mon: sanitizePokemon(e.mon) }));
-    if (data.daycareEgg !== undefined) daycareEgg = data.daycareEgg;
+    merged = true;
   }
 
   // Always merge quest/NPC progress (non-destructive)
@@ -8033,21 +7977,175 @@ async function sendChatMessage() {
 // ================================================================
 function renderTrainerCard() {
   // Chat sidebar: online players
-  const onlineList = document.getElementById("chat-online-list");
+  const onlineList = document.getElementById('chat-online-list');
   if (onlineList) {
     onlineList.innerHTML = onlinePlayersList.length === 0
-      ? "<span>-</span>"
-      : onlinePlayersList.map(p => "<div>🟢 "+(p.username||"Тренер")+"</div>").join("");
+      ? '<span style="color:var(--tma-text-muted)">-</span>'
+      : onlinePlayersList.map(p => `<div style="padding:2px 0;">🟢 ${p.username||'Тренер'}</div>`).join('');
   }
-  const countEl = document.getElementById("chat-online-count");
-  if (countEl) countEl.innerText = onlinePlayersList.length > 0 ? "("+onlinePlayersList.length+")" : "";
-  // Old elements - safe null checks
-  const ne=document.getElementById("trainer-name"); if(ne){ne.innerText=trainerNickname||tgUser?.first_name||tgUser?.username||"Тренер";ne.onclick=()=>{showTextInputModal("Прозвище",trainerNickname||tgUser?.first_name||"",(n)=>{trainerNickname=n;renderTrainerCard();autoSave();});};}
-  const me=document.getElementById("trainer-money"); if(me)me.innerText="¥"+money;
-  const be=document.getElementById("trainer-badges"); if(be)be.innerText=badges.length;
-  const ce=document.getElementById("trainer-caught"); if(ce)ce.innerText=pokedexCaught.size+"/151";
-  const te=document.getElementById("trainer-team"); if(te&&myTeam&&myTeam.length>0){te.innerHTML="";myTeam.forEach(m=>{const d=document.createElement("div");d.innerHTML="<span>"+(m.nickname||m.apiData?.name)+" Lv"+(m.baseLevel+(m.candiesEaten||0))+"</span>";te.appendChild(d);});}
+  const countEl = document.getElementById('chat-online-count');
+  if (countEl) countEl.innerText = onlinePlayersList.length > 0 ? `(${onlinePlayersList.length})` : '';
+  // Old trainer card elements hidden
+  const nameEl = document.getElementById('trainer-name');
+  const moneyEl = document.getElementById('trainer-money');
+  const badgesEl = document.getElementById('trainer-badges');
+  const caughtEl = document.getElementById('trainer-caught');
+  const teamEl = document.getElementById('trainer-team');
+
+  if (trainerNickname) {
+    nameEl.innerText = trainerNickname;
+  } else if (tgUser) {
+    nameEl.innerText = tgUser.first_name || tgUser.username || `ID:${tgUser.id}`;
+  } else {
+    nameEl.innerText = 'Загрузка...';
+  }
+  nameEl.style.cursor = 'pointer';
+  nameEl.title = 'Нажмите чтобы изменить прозвище';
+  nameEl.onclick = () => {
+    showTextInputModal('Прозвище тренера', trainerNickname || tgUser?.first_name || '', (newName) => {
+      trainerNickname = newName;
+      renderTrainerCard();
+      autoSave();
+    });
+  };
+
+  moneyEl.innerText = `¥${money}`;
+  badgesEl.innerText = badges.length;
+  caughtEl.innerText = `${pokedexCaught.size}/151`;
+
+  if (!myTeam || myTeam.length === 0) {
+    teamEl.innerHTML = '<div class="trainer-team-empty">Нет покемонов</div>';
+    return;
+  }
+
+  teamEl.innerHTML = '';
+  myTeam.forEach(mon => {
+    const div = document.createElement('div');
+    div.className = 'trainer-team-mon';
+    const lvl = mon.baseLevel + (mon.candiesEaten || 0);
+    const spriteUrl = mon.apiData?.sprites?.other?.['official-artwork']?.front_default || mon.apiData?.sprites?.front_default || '';
+    const typeBg = mon.apiData?.types ? getTypeGradient(mon.apiData.types) : '';
+    div.innerHTML = `
+      <div class="trainer-team-mon-img-box" style="background:${typeBg};">
+        <img class="trainer-team-mon-img" src="${spriteUrl}" alt="">
+      </div>
+      <div class="trainer-team-mon-info">
+        <div class="trainer-team-mon-name">${mon.nickname || mon.apiData.name}</div>
+        <div class="trainer-team-mon-lvl">Lv${lvl}</div>
+      </div>`;
+    teamEl.appendChild(div);
+  });
+
+  // Load trainers at location
+  loadLocationTrainers();
 }
+
+// ================================================================
+// TRAINER LOCATION & PROFILES
+// ================================================================
+async function updatePlayerLocation() {
+  const headers = getCloudAuthHeaders();
+  if (!headers.Authorization) return;
+  try {
+    await fetch(`${API_BASE}/profile/location`, {
+      method: 'POST',
+      headers: { ...headers, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ locationId: currentLocationId, region: currentRegion })
+    });
+  } catch (e) {
+    // silent
+  }
+}
+
+async function loadLocationTrainers() {
+  const listEl = document.getElementById('trainer-location-list');
+  if (!listEl) return;
+  try {
+    const res = await fetch(`${API_BASE}/profile/trainers?locationId=${encodeURIComponent(currentLocationId)}`);
+    const data = await res.json();
+    if (!data.trainers || data.trainers.length === 0) {
+      listEl.innerHTML = '<div class="trainer-location-trainer" style="color:#4a6a7a;cursor:default;">Никого нет</div>';
+      return;
+    }
+    listEl.innerHTML = '';
+    data.trainers.forEach(t => {
+      const div = document.createElement('div');
+      div.className = 'trainer-location-trainer';
+      const name = t.first_name || t.username || `Trainer#${t.id}`;
+      div.innerText = name;
+      div.addEventListener('click', () => openTrainerProfile(t.id));
+      listEl.appendChild(div);
+    });
+  } catch (e) {
+    listEl.innerHTML = '<div style="color:#4a6a7a;">Ошибка загрузки</div>';
+  }
+}
+
+function updateTrainerLocationList(data) {
+  const listEl = document.getElementById('trainer-location-list');
+  if (!listEl || !data) return;
+  // Remove empty-state message if present
+  const emptyMsg = listEl.querySelector('.trainer-location-trainer[style]');
+  if (emptyMsg) emptyMsg.remove();
+  // Avoid duplicates
+  const existing = listEl.querySelector(`[data-trainer-id="${data.userId}"]`);
+  if (existing) return;
+  const div = document.createElement('div');
+  div.className = 'trainer-location-trainer';
+  div.setAttribute('data-trainer-id', data.userId);
+  const name = data.firstName || data.username || `Trainer#${data.userId}`;
+  div.innerText = name;
+  div.addEventListener('click', () => openTrainerProfile(data.userId));
+  listEl.appendChild(div);
+}
+
+async function openTrainerProfile(userId) {
+  const modal = document.getElementById('trainer-profile-modal');
+  if (!modal) return;
+  modal.style.display = 'flex';
+
+  document.getElementById('modal-trainer-name').innerText = 'Загрузка...';
+  document.getElementById('modal-trainer-money').innerText = '$0';
+  document.getElementById('modal-trainer-badges').innerText = '0';
+  document.getElementById('modal-trainer-team').innerHTML = '<div class="trainer-team-empty">Загрузка...</div>';
+
+  try {
+    const res = await fetch(`${API_BASE}/profile/${userId}`);
+    const data = await res.json();
+    if (!data.profile) {
+      document.getElementById('modal-trainer-name').innerText = 'Тренер не найден';
+      return;
+    }
+
+    const p = data.profile;
+    document.getElementById('modal-trainer-name').innerText = p.first_name || p.username || `Trainer#${p.id}`;
+    document.getElementById('modal-trainer-money').innerText = `¥${p.money}`;
+    document.getElementById('modal-trainer-badges').innerText = p.badges;
+
+    const teamEl = document.getElementById('modal-trainer-team');
+    teamEl.innerHTML = '';
+    if (!p.team || p.team.length === 0) {
+      teamEl.innerHTML = '<div class="trainer-team-empty">Нет покемонов</div>';
+      return;
+    }
+    p.team.forEach(mon => {
+      const div = document.createElement('div');
+      div.className = 'trainer-team-mon';
+      div.innerHTML = `
+        <div class="trainer-team-mon-img-box">
+          <img class="trainer-team-mon-img" src="${mon.sprite || ''}" alt="">
+        </div>
+        <div class="trainer-team-mon-info">
+          <div class="trainer-team-mon-name">${mon.nickname || mon.name}</div>
+          <div class="trainer-team-mon-lvl">Lv${mon.level}</div>
+        </div>`;
+      teamEl.appendChild(div);
+    });
+  } catch (e) {
+    document.getElementById('modal-trainer-name').innerText = 'Ошибка загрузки';
+  }
+}
+
 // --- P2P TRADING VIA SOCKET.IO ---
 let socket = null;
 let onlinePlayersList = [];
