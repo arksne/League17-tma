@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { authMiddleware } from '../middleware/auth.js';
 import { getDB } from '../db.js';
 import { getIO } from '../socket.js';
+import zlib from 'zlib';
 
 const router = Router();
 
@@ -10,6 +11,14 @@ const CLAUDE_ID = 0;
 const CLAUDE_USERNAME = 'Claude_AI';
 const CLAUDE_NAME = 'Claude AI';
 const ADMIN_USERNAMES = new Set(['DjafarAdjarov', 'nineinchkn5atmythroat']);
+
+function decompressSave(raw) {
+  if (!raw) return null;
+  if (raw.startsWith('Z:')) {
+    try { return JSON.parse(zlib.inflateSync(Buffer.from(raw.slice(2), 'base64')).toString()); } catch(e) { return null; }
+  }
+  try { return JSON.parse(raw); } catch(e) { return null; }
+}
 
 async function sendClaudeMessage(text, io, db) {
   const msg = {
@@ -85,12 +94,15 @@ async function claudeAutoReply(userText, io, db, username) {
       const save = await db.get('SELECT save_data FROM game_saves WHERE user_id = ?', u.id);
       if (!save) { reply = 'Нет сохранения у ' + target; }
       else {
-        let data = JSON.parse(save.save_data);
-        if (!data.inventory) data.inventory = {};
-        ['pokeball','greatBall','ultraBall','masterBall','potion','superPotion','fullRestore','candy','vitamin','train','weaken','evolutionStone','fireStone','waterStone','leafStone','thunderStone','moonStone','tm','ppUp','antidote','antiparalyze','energyDrink','fireExtinguisher','elixir','strongElixir','luckyEgg','expShare','oldRod','goodRod','superRod','darkBall'].forEach(id => { data.inventory[id] = 99; });
-        data.money = (data.money||0) + 100000;
-        await db.run('UPDATE game_saves SET save_data=?, updated_at=datetime(\'now\') WHERE user_id=?', JSON.stringify(data), u.id);
-        reply = `✅ ${target}: предметы x99 + 100к¥`;
+        let data = decompressSave(save.save_data);
+        if (!data) { reply = 'Ошибка чтения сейва ' + target; }
+        else {
+          if (!data.inventory) data.inventory = {};
+          ['pokeball','greatBall','ultraBall','masterBall','potion','superPotion','fullRestore','candy','vitamin','train','weaken','evolutionStone','fireStone','waterStone','leafStone','thunderStone','moonStone','tm','ppUp','antidote','antiparalyze','energyDrink','fireExtinguisher','elixir','strongElixir','luckyEgg','expShare','oldRod','goodRod','superRod','darkBall'].forEach(id => { data.inventory[id] = 99; });
+          data.money = (data.money||0) + 100000;
+          await db.run('UPDATE game_saves SET save_data=?, updated_at=datetime(\'now\') WHERE user_id=?', JSON.stringify(data), u.id);
+          reply = `✅ ${target}: предметы x99 + 100к¥`;
+        }
       }
     }
   } else if (cmd === '!дай' && parts[1] === 'деньги' && parts[2]) {
@@ -101,7 +113,7 @@ async function claudeAutoReply(userText, io, db, username) {
       const save = await db.get('SELECT save_data FROM game_saves WHERE user_id = ?', u.id);
       if (!save) { reply = 'Нет сохранения'; }
       else {
-        let data = JSON.parse(save.save_data); data.money = (data.money||0) + amount;
+        let data = decompressSave(save.save_data); data.money = (data.money||0) + amount;
         await db.run('UPDATE game_saves SET save_data=?, updated_at=datetime(\'now\') WHERE user_id=?', JSON.stringify(data), u.id);
         reply = `💰 ${target}: +${amount}¥ (теперь ${data.money}¥)`;
       }
@@ -114,7 +126,7 @@ async function claudeAutoReply(userText, io, db, username) {
       const save = await db.get('SELECT save_data FROM game_saves WHERE user_id = ?', u.id);
       if (!save) { reply = 'Нет сохранения'; }
       else {
-        let data = JSON.parse(save.save_data);
+        let data = decompressSave(save.save_data);
         data.badges = ['Boulder Badge','Cascade Badge','Thunder Badge','Rainbow Badge','Marsh Badge','Soul Badge','Volcano Badge','Earth Badge'];
         await db.run('UPDATE game_saves SET save_data=?, updated_at=datetime(\'now\') WHERE user_id=?', JSON.stringify(data), u.id);
         reply = `🏅 ${target}: 8 значков!`;
@@ -128,7 +140,7 @@ async function claudeAutoReply(userText, io, db, username) {
       const save = await db.get('SELECT save_data FROM game_saves WHERE user_id = ?', u.id);
       if (!save) { reply = 'Нет сохранения'; }
       else {
-        let data = JSON.parse(save.save_data); (data.myTeam||[]).forEach(m => { m.currentHp=m.maxHp; m.status=null; m.sleepTurns=0; });
+        let data = decompressSave(save.save_data); (data.myTeam||[]).forEach(m => { m.currentHp=m.maxHp; m.status=null; m.sleepTurns=0; });
         await db.run('UPDATE game_saves SET save_data=?, updated_at=datetime(\'now\') WHERE user_id=?', JSON.stringify(data), u.id);
         reply = `🏥 ${target}: команда вылечена`;
       }
@@ -145,7 +157,7 @@ async function claudeAutoReply(userText, io, db, username) {
       else {
         const legends = ['mewtwo','mew','lugia','ho-oh','rayquaza','groudon','kyogre','dialga','palkia','zekrom','reshiram'];
         const pick = legends[Math.floor(Math.random()*legends.length)];
-        let data = JSON.parse(save.save_data);
+        let data = decompressSave(save.save_data);
         try {
           const pokeRes = await fetch(`https://pokeapi.co/api/v2/pokemon/${pick}`);
           const pokeData = await pokeRes.json();
@@ -187,7 +199,7 @@ async function fixPlayer(username, db, fn, label) {
   if (!u) return 'Игрок не найден: ' + username;
   const save = await db.get('SELECT save_data FROM game_saves WHERE user_id = ?', u.id);
   if (!save) return 'Нет сохранения у ' + username;
-  let data = JSON.parse(save.save_data);
+  let data = decompressSave(save.save_data);
   (data.myTeam||[]).forEach(fn);
   await db.run('UPDATE game_saves SET save_data=?, updated_at=datetime(\'now\') WHERE user_id=?', JSON.stringify(data), u.id);
   return `${label}: ${username} (${data.myTeam.length} покемонов)`;

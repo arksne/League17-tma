@@ -27,6 +27,7 @@ router.get('/', async (req, res) => {
     let data;
     try { data = JSON.parse(raw); } catch (e) {
       console.error(`Corrupted save user ${req.userId}, trying recovery...`);
+      if (!fs.existsSync(BACKUP_DIR)) return res.status(500).json({ error: 'Save corrupted, no backups available' });
       const backups = fs.readdirSync(BACKUP_DIR).filter(f => f.startsWith(`user_${req.userId}_`)).sort().reverse();
       if (backups.length > 0) {
         data = JSON.parse(fs.readFileSync(path.join(BACKUP_DIR, backups[0]), 'utf8'));
@@ -117,7 +118,7 @@ router.post('/', async (req, res) => {
     }
 
     // Wrap in transaction to prevent data corruption on crash
-    await db.run('BEGIN');
+    await db.exec('BEGIN');
     try {
       await db.run(
         `INSERT INTO game_saves (user_id, save_data, updated_at)
@@ -150,9 +151,9 @@ router.post('/', async (req, res) => {
       // Clean old action_log entries (keep last 1000 per user)
       await db.run(`DELETE FROM action_log WHERE user_id = ? AND id NOT IN (SELECT id FROM action_log WHERE user_id = ? ORDER BY id DESC LIMIT 1000)`, req.userId, req.userId);
 
-      await db.run('COMMIT');
+      await db.exec('COMMIT');
     } catch (e) {
-      await db.run('ROLLBACK');
+      try { await db.exec('ROLLBACK'); } catch(_) {}
       throw e;
     }
 

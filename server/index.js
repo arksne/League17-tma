@@ -62,23 +62,28 @@ app.get('/api/health', async (req, res) => {
   }
 });
 
-// Global error handler
-app.use((err, req, res, next) => {
-  console.error('Unhandled error:', err.message);
-  res.status(500).json({ error: 'Internal server error' });
-});
-
 // Serve static files
 app.use(express.static(path.join(__dirname, '../dist')));
 app.use('/avatars', express.static(path.join(__dirname, '../public/avatars')));
 
-// SPA fallback
+// SPA fallback — must be AFTER static but BEFORE error handler
 app.use((req, res, next) => {
-  if (!req.path.startsWith('/api')) {
-    res.sendFile(path.join(__dirname, '../dist/index.html'));
+  if (!req.path.startsWith('/api') && !req.path.startsWith('/admin')) {
+    const indexPath = path.join(__dirname, '../dist/index.html');
+    if (fs.existsSync(indexPath)) {
+      res.sendFile(indexPath);
+    } else {
+      res.status(404).send('Build not found. Run npm run build first.');
+    }
   } else {
     next();
   }
+});
+
+// Global error handler — MUST be last middleware
+app.use((err, req, res, next) => {
+  console.error('Unhandled error:', err.stack || err.message);
+  res.status(500).json({ error: 'Internal server error' });
 });
 
 // === Periodic WAL checkpoint (every 5 min) ===
