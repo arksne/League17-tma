@@ -2034,12 +2034,16 @@ function openNPCDialog(npcId) {
       : npc.dialog.quest_incomplete;
   } else if (availableQuests.length > 0) {
     const q = availableQuests[0];
-    dialogText = npc.dialog.quest_offer
-      .replace('{target}', q.targetQty);
-    if (q.targetItem) {
-      dialogText = dialogText.replace('{item}', itemDef(q.targetItem).nameRu);
+    if (npc.dialog.quest_offer) {
+      dialogText = npc.dialog.quest_offer
+        .replace('{target}', q.targetQty);
+      if (q.targetItem) {
+        dialogText = dialogText.replace('{item}', itemDef(q.targetItem).nameRu);
+      } else {
+        dialogText = dialogText.replace('{item}', '').replace('  ', ' ').trim();
+      }
     } else {
-      dialogText = dialogText.replace('{item}', '').replace('  ', ' ').trim();
+      dialogText = `${npc.dialog.greet} Есть задание: ${q.desc}`;
     }
   }
 
