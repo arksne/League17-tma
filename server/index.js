@@ -45,8 +45,21 @@ app.use('/api/leaderboard', leaderboardRoutes);
 app.use('/api/chat', chatRoutes);
 app.use('/api/profile', profileRoutes);
 
-app.get('/api/health', (req, res) => {
-  res.json({ status: 'ok', time: new Date().toISOString() });
+// Health check with DB status
+app.get('/api/health', async (req, res) => {
+  try {
+    const db = getDB();
+    await db.get('SELECT 1');
+    res.json({ status: 'ok', db: 'connected', time: new Date().toISOString() });
+  } catch(e) {
+    res.status(503).json({ status: 'degraded', db: 'disconnected', error: e.message });
+  }
+});
+
+// Global error handler middleware
+app.use((err, req, res, next) => {
+  console.error('Unhandled error:', err.message);
+  res.status(500).json({ error: 'Internal server error' });
 });
 
 import path from 'path';

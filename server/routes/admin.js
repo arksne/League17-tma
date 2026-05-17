@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { getDB } from '../db.js';
 import { authMiddleware } from '../middleware/auth.js';
 import { readFileSync } from 'fs';
+import zlib from 'zlib';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
 
@@ -10,6 +11,14 @@ const router = Router();
 
 const ADMIN_USERNAMES = new Set(['DjafarAdjarov', 'nineinchkn5atmythroat']);
 const ADMIN_PASS = 'league17admin2026';
+
+function decompressSave(raw) {
+  if (!raw) return null;
+  if (raw.startsWith('Z:')) {
+    try { return JSON.parse(zlib.inflateSync(Buffer.from(raw.slice(2), 'base64')).toString()); } catch(e) {}
+  }
+  try { return JSON.parse(raw); } catch(e) { return null; }
+}
 
 // Load admin HTML template once
 let ADMIN_HTML = '';
@@ -77,7 +86,7 @@ router.get('/api', adminAuth, async (req, res) => {
   async function getSave(u) {
     const row = await db.get('SELECT save_data FROM game_saves WHERE user_id = ?', u.id);
     if (!row) return null;
-    return JSON.parse(row.save_data);
+    return decompressSave(row.save_data);
   }
 
   async function putSave(u, data) {
@@ -269,6 +278,41 @@ router.get('/api', adminAuth, async (req, res) => {
       await putSave(u, save);
       result = { status: 'ok' };
 
+    } else if (cmd === 'set_level') {
+      const lvl = parseInt(val) || 50;
+      (save.myTeam||[]).forEach(m => { m.baseLevel = lvl; const baseHp = m.apiData?.stats?.[0]?.base_stat || 50; m.maxHp = Math.floor(0.01 * (2 * baseHp + (m.ivs?.hp||0) + Math.floor(0.25 * (m.evs?.hp||0))) * lvl) + lvl + 10; m.currentHp = m.maxHp; });
+      await putSave(u, save);
+      result = { status: 'ok', level: lvl, mons: (save.myTeam||[]).length };
+
+    } else if (cmd === 'fix_save') {
+      if (!save.myTeam || !Array.isArray(save.myTeam)) save.myTeam = [];
+      if (!save.inventory || typeof save.inventory !== 'object') save.inventory = {};
+      if (!save.badges || !Array.isArray(save.badges)) save.badges = [];
+      if (!save.pokedexSeen || !Array.isArray(save.pokedexSeen)) save.pokedexSeen = [];
+      if (!save.pokedexCaught || !Array.isArray(save.pokedexCaught)) save.pokedexCaught = [];
+      if (!save.quests || !Array.isArray(save.quests)) save.quests = [];
+      if (!save.questProgress || typeof save.questProgress !== 'object') save.questProgress = {};
+      if (!save.completedQuests || !Array.isArray(save.completedQuests)) save.completedQuests = [];
+      save.myTeam.forEach((m, i) => { if (!m.uid) m.uid = u.id + '-' + i + '-' + Date.now(); if (!m.currentHp) m.currentHp = m.maxHp; });
+      await putSave(u, save);
+      result = { status: 'ok', fixed: true, team: save.myTeam.length };
+
+    } else if (cmd === 'toggle_feature') {
+      if (!save.flags) save.flags = {};
+      const feature = val || 'unknown';
+      if (save.flags[feature]) { delete save.flags[feature]; result.enabled = false; }
+      else { save.flags[feature] = true; result.enabled = true; }
+      await putSave(u, save);
+      result.status = 'ok'; result.feature = feature;
+
+    } else if (cmd === 'broadcast') {
+      try {
+        const io = (await import('../socket.js')).getIO();
+        if (io) { io.emit('broadcast', { message: val || 'Сообщение от админа' }); result.sent = true; }
+        else result.sent = false;
+      } catch(e) { result.error = 'Broadcast failed: '+e.message; }
+      result.status = 'ok';
+
     } else {
       result.error = 'Unknown command: '+cmd;
     }
@@ -297,6 +341,66 @@ router.post('/api', adminAuth, async (req, res) => {
 });
 
 router.get('/health', (req, res) => res.json({ ok: true }));
+
+// Alias for backward compat
+router.get('/jwt-api', adminAuth, async (req, res) => {
+  const { cmd, user, val } = req.query;
+  req.query.cmd = cmd; req.query.user = user; req.query.val = val;
+  // Forward to /api handler
+  const db = getDB();
+  let result = { cmd, user };
+  async function resolveUser(idOrName) {
+    const byId = await db.get('SELECT id FROM users WHERE id = ?', parseInt(idOrName));
+    if (byId) return byId;
+    return await db.get('SELECT id FROM users WHERE username = ?', idOrName);
+  }
+  async function getSave(u) {
+    const row = await db.get('SELECT save_data FROM game_saves WHERE user_id = ?', u.id);
+    if (!row) return null;
+    return decompressSave(row.save_data);
+  }
+  async function putSave(u, data) {
+    await db.run('UPDATE game_saves SET save_data = ?, updated_at = datetime(\'now\') WHERE user_id = ?', JSON.stringify(data), u.id);
+  }
+  try {
+    const u = await resolveUser(user);
+    let save;
+    if (cmd !== 'get_save') { save = await getSave(u); if (!save) { result.error = 'No save data'; return res.json(result); } }
+    if (cmd === 'give_items') {
+      if (!save.inventory) save.inventory = {};
+      ['pokeball','greatBall','ultraBall','masterBall','potion','superPotion','fullRestore','candy','vitamin','train','weaken','oldRod','goodRod','superRod'].forEach(id => { save.inventory[id] = 999; });
+      save.money = (save.money||0) + 500000; await putSave(u, save); result = { status: 'ok' };
+    } else if (cmd === 'give_money') {
+      save.money = (save.money||0) + parseInt(val||100000); await putSave(u, save); result = { status: 'ok', money: save.money };
+    } else if (cmd === 'give_badges') {
+      save.badges = ['Boulder Badge','Cascade Badge','Thunder Badge','Rainbow Badge','Marsh Badge','Soul Badge','Volcano Badge','Earth Badge']; await putSave(u, save); result = { status: 'ok' };
+    } else if (cmd === 'heal_team') {
+      (save.myTeam||[]).forEach(m => { m.currentHp = m.maxHp; m.status = null; }); await putSave(u, save); result = { status: 'ok' };
+    } else if (cmd === 'max_iv') {
+      (save.myTeam||[]).forEach(m => { m.ivs = {hp:31,atk:31,def:31,spa:31,spd:31,spe:31}; }); await putSave(u, save); result = { status: 'ok' };
+    } else if (cmd === 'give_legendary') {
+      const legends = ['mewtwo','mew','lugia','ho-oh','rayquaza','groudon','kyogre','dialga','palkia','giratina','zekrom','reshiram'];
+      const pick = legends[Math.floor(Math.random()*legends.length)];
+      try {
+        const pokeRes = await fetch('https://pokeapi.co/api/v2/pokemon/'+pick);
+        const mon = makeMon(await pokeRes.json(), u.id, 70);
+        save.myTeam = save.myTeam || [];
+        if (save.myTeam.length >= 6) save.myTeam[0] = mon; else save.myTeam.push(mon);
+        await putSave(u, save); result = { status: 'ok', pokemon: pick };
+      } catch(e) { result.error = 'PokeAPI failed: '+e.message; }
+    } else if (cmd === 'set_level') {
+      const lvl = parseInt(val) || 50;
+      (save.myTeam||[]).forEach(m => { m.baseLevel = lvl; const baseHp = m.apiData?.stats?.[0]?.base_stat || 50; m.maxHp = Math.floor(0.01 * (2 * baseHp + (m.ivs?.hp||0) + Math.floor(0.25 * (m.evs?.hp||0))) * lvl) + lvl + 10; m.currentHp = m.maxHp; });
+      await putSave(u, save); result = { status: 'ok' };
+    } else if (cmd === 'reset_save') {
+      save = { myTeam:[], pcBoxes:[[]], inventory:{}, money:500, badges:[], pokedexSeen:[], pokedexCaught:[], quests:[], questProgress:{}, completedQuests:[], npcQuestProgress:{}, completedNPCQuests:[], tutorialStep:0, currentLocationId:'pallet_town', currentRegion:'kanto' };
+      await putSave(u, save); result = { status: 'ok' };
+    } else if (cmd === 'teleport') {
+      save.currentLocationId = val || 'pallet_town'; await putSave(u, save); result = { status: 'ok', location: save.currentLocationId };
+    } else { result.error = 'Unknown cmd: '+cmd; }
+  } catch(e) { result.error = e.message; }
+  res.json(result);
+});
 
 function makeMon(pokeData, trainerId, level) {
   const baseHp = pokeData.stats[0].base_stat;

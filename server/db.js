@@ -9,20 +9,28 @@ const __dirname = path.dirname(__filename);
 
 let db;
 
-export async function initDB() {
-  // Ensure the data directory exists (Railway doesn't auto-create it)
-  const dataDir = path.join(__dirname, '../data');
+export async function initDB(retries = 3) {
+  const dataDir = process.env.DATA_DIR || process.env.RAILWAY_VOLUME_MOUNT_PATH || path.join(__dirname, '../data');
   mkdirSync(dataDir, { recursive: true });
 
-  db = await open({
-    filename: path.join(dataDir, 'game.db'),
-    driver: sqlite3.Database
-  });
+  for (let attempt = 1; attempt <= retries; attempt++) {
+    try {
+      db = await open({
+        filename: path.join(dataDir, 'game.db'),
+        driver: sqlite3.Database
+      });
+      break;
+    } catch (e) {
+      console.error(`DB connection attempt ${attempt}/${retries} failed:`, e.message);
+      if (attempt === retries) throw e;
+      await new Promise(r => setTimeout(r, 1000 * attempt));
+    }
+  }
 
   // Enable WAL mode for concurrent reads/writes
-  await db.exec('PRAGMA journal_mode=WAL;');
+  try { await db.exec('PRAGMA journal_mode=WAL;'); } catch(e) { console.warn('WAL mode failed:', e.message); }
   // Enable foreign key enforcement
-  await db.exec('PRAGMA foreign_keys=ON;');
+  try { await db.exec('PRAGMA foreign_keys=ON;'); } catch(e) {}
 
   await db.exec(`
     CREATE TABLE IF NOT EXISTS users (

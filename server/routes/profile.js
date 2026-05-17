@@ -2,6 +2,15 @@ import { Router } from 'express';
 import { authMiddleware } from '../middleware/auth.js';
 import { getDB } from '../db.js';
 import { getIO } from '../socket.js';
+import zlib from 'zlib';
+
+function decompressSave(raw) {
+  if (!raw) return null;
+  if (raw.startsWith('Z:')) {
+    try { return JSON.parse(zlib.inflateSync(Buffer.from(raw.slice(2), 'base64')).toString()); } catch(e) {}
+  }
+  try { return JSON.parse(raw); } catch(e) { return null; }
+}
 
 const router = Router();
 
@@ -90,7 +99,8 @@ router.get('/profile/:userId', async (req, res) => {
 
     if (save && save.save_data) {
       try {
-        const data = JSON.parse(save.save_data);
+        const data = decompressSave(save.save_data);
+        if (!data) throw new Error('decompress failed');
         profile.team = (data.myTeam || []).map(m => ({
           name: m.apiData?.name || 'Unknown',
           nickname: m.nickname || null,
@@ -121,11 +131,13 @@ router.get('/trainers/all', async (req, res) => {
       const loc = await db.get('SELECT location_id, updated_at FROM user_locations WHERE user_id = ?', u.id);
       if (save) {
         try {
-          const data = JSON.parse(save.save_data);
-          u.badges = data.badges?.length || 0;
-          u.money = data.money || 0;
-          u.teamSize = (data.myTeam || []).length;
-          u.lastSave = save.updated_at;
+          const data = decompressSave(save.save_data);
+          if (data) {
+            u.badges = data.badges?.length || 0;
+            u.money = data.money || 0;
+            u.teamSize = (data.myTeam || []).length;
+            u.lastSave = save.updated_at;
+          }
         } catch(e) { u.badges = 0; u.money = 0; u.teamSize = 0; }
       }
       u.lastLocation = loc?.location_id || null;
