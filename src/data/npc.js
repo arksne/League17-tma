@@ -188,7 +188,7 @@ export const NPC_DATA = {
   'saffron_officer': {
     id: 'saffron_officer', name: 'Офицер Джес', sprite: '👮', location: 'saffron',
     dialog: { greet: 'Офицер Джес из Канто. Слежу за порядком.', default: 'Если заметите нарушения правил Лиги-17, обращайтесь ко мне.', quest_offer: 'Новичкам нужно снаряжение. Принеси мне {target} {item}.', quest_complete: 'Отлично! Теперь ты экипирован.', quest_incomplete: 'Приходи когда соберёшь всё.' },
-    quests: [{ id: 'saffron_1', type: 'collect_items', targetItem: 'potion', targetQty: 3, desc: 'Принесите 3 Зелья', rewardMoney: 300, rewardItem: 'pokeball', rewardQty: 5, prereqQuest: null }, { id: 'lavender_terror', type: 'explore', targetItem: null, targetQty: 3, desc: 'Разберитесь в причине нападений диких монстров в Лавандии — посетите 3 локации', rewardMoney: 0, rewardItem: 'tm', rewardQty: 1, prereqQuest: null }],
+    quests: [{ id: 'saffron_1', type: 'collect_items', targetItem: 'potion', targetQty: 3, desc: 'Принесите 3 Зелья', rewardMoney: 300, rewardItem: 'pokeball', rewardQty: 5, prereqQuest: null }, { id: 'saffron_terror', type: 'explore', targetItem: null, targetQty: 3, desc: 'Разберитесь в причине нападений диких монстров в Лавандии — посетите 3 локации', rewardMoney: 0, rewardItem: 'tm', rewardQty: 1, prereqQuest: null }],
   },
   // === WEST JOHTO QUEST NPCs ===
   'wj_mantej': {
