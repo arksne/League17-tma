@@ -1,2 +1,3 @@
-Railway Railpack build: python3 is installed via RAILPACK_APT_PKGS env var
-to enable sqlite3 native addon compilation (node-gyp needs Python).
+Railway Railpack build fix:
+- RAILPACK_BUILD_APT_PACKAGES=python3 — installs Python for node-gyp to compile sqlite3 native addon
+- RAILPACK_PYTHON_VERSION=3.12 — pins Python version
