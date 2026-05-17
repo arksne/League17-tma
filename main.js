@@ -99,13 +99,13 @@ export function travelToRegion(targetRegion, targetLoc, ticketItemId) {
   renderLocation(targetLoc);
 }
 
-let currentLocationId = 'pallet_town';
+let currentLocationId = 'goldenrod';
 let pokedexSeen = new Set();
 let pokedexCaught = new Set();
 let isDaytime = true;
 let itemsUsedInBattle = 0;
 let lastLocation = null;
-let currentRegion = 'kanto';
+let currentRegion = 'east_johto';
 let expShareActive = false;
 
 // --- EXISTING PROFILE DATA ---
@@ -870,6 +870,17 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   // Sell tab init
   initSellTab();
+
+  // Location tabs
+  document.querySelectorAll('.loc-tab').forEach(tab => {
+    tab.addEventListener('click', () => {
+      document.querySelectorAll('.loc-tab').forEach(t => t.classList.remove('active'));
+      tab.classList.add('active');
+      document.querySelectorAll('.loc-tab-content').forEach(c => c.style.display = 'none');
+      const target = document.getElementById('loc-tab-' + tab.dataset.tab);
+      if (target) target.style.display = 'block';
+    });
+  });
 
   // Generate daily quests
   generateDailyQuests();
@@ -1704,15 +1715,15 @@ function loadGame() {
     saveVersion = parseInt(localStorage.getItem(lsKey('save_v')) || '0');
     lastCloudSync = parseInt(localStorage.getItem(lsKey('save_ts')) || '0');
 
-    currentLocationId = data.currentLocationId || 'pallet_town';
-    currentRegion = data.currentRegion || 'kanto';
+    currentLocationId = data.currentLocationId || 'goldenrod';
+    currentRegion = data.currentRegion || 'east_johto';
     // Migrate old region keys
     if (currentRegion === 'tevas_islands') currentRegion = 'southern_archipelago';
-    if (!REGIONS[currentRegion]) currentRegion = 'kanto';
+    if (!REGIONS[currentRegion]) currentRegion = 'east_johto';
     // Validate location exists
     if (!getLocation(currentLocationId)) {
-      currentLocationId = 'pallet_town';
-      currentRegion = 'kanto';
+      currentLocationId = 'goldenrod';
+      currentRegion = 'east_johto';
     }
 
     if (data.inventory) {
@@ -1986,6 +1997,7 @@ function initAppNav() {
         loadChatMessages();
         renderTrainerCard();
         startChatPolling();
+        initTradeSocket();
       } else {
         stopChatPolling();
       }
@@ -2427,6 +2439,47 @@ export function renderLocation(locId) {
     });
   }
 
+  // Location info: wild tab content
+  const wildTab = document.getElementById('loc-tab-wild');
+  const wildlifeEl = document.getElementById('loc-wildlife');
+  const wildlifeDetail = document.getElementById('loc-wildlife-detail');
+  const wildlifeEmpty = document.getElementById('loc-wildlife-empty');
+
+  if (huntEncounters && huntEncounters.length > 0) {
+    const uniqueMons = [...new Set(huntEncounters.filter(n => typeof n === 'string'))];
+    if (uniqueMons.length > 0) {
+      const monList = uniqueMons.slice(0, 10).join(', ') + (uniqueMons.length > 10 ? '...' : '');
+
+      const dropSet = new Set();
+      uniqueMons.forEach(name => {
+        (MONSTER_DROP_TABLE[name] || []).forEach(d => dropSet.add(d.item));
+      });
+      const dropStr = [...dropSet].slice(0, 6).map(id => {
+        const def = ITEMS.find(i => i.id === id);
+        return def ? def.nameRu : id;
+      }).join(', ');
+
+      wildlifeDetail.innerHTML = `
+        <div style="margin-bottom:6px"><b>🐾 Покемоны (${uniqueMons.length}):</b><br>${monList}</div>
+        <div><b>💧 Дроп (${dropSet.size}):</b><br>${dropStr || 'нет'}</div>
+      `;
+      wildlifeEl.style.display = 'block';
+      wildlifeEmpty.style.display = 'none';
+    } else {
+      wildlifeEl.style.display = 'none';
+      wildlifeEmpty.style.display = 'block';
+    }
+  } else {
+    wildlifeEl.style.display = 'none';
+    wildlifeEmpty.style.display = 'block';
+  }
+
+  // Reset to desc tab on location change
+  document.querySelectorAll('.loc-tab').forEach(t => t.classList.remove('active'));
+  document.querySelector('.loc-tab[data-tab="desc"]')?.classList.add('active');
+  document.getElementById('loc-tab-desc').style.display = 'block';
+  if (wildTab) wildTab.style.display = 'none';
+
   // Back from pokecenter
   if ((locId === 'pokecenter' || locId.endsWith('_pokecenter')) && lastLocation) {
     const backLoc = getLocation(lastLocation);
@@ -2585,7 +2638,91 @@ export function updateMoneyDisplay() {
 
 function updateBadgeDisplay() {
   const el = document.getElementById('badge-display');
-  if (el) el.innerText = `Значки: ${badges.length}/8`;
+  if (el) {
+    const icons = badges.map(b => {
+      const leader = Object.values(gymLeaders).find(l => l.badgeName === b);
+      return leader?.badgeIcon || '🏅';
+    });
+    el.innerText = `Значки (${badges.length}/16): ${icons.join(' ')}`;
+  }
+}
+
+// --- GYM REWARD SELECTION ---
+function getBestNatureIdx(pokeData) {
+  const stats = pokeData.stats;
+  const atk  = stats.find(s => s.stat.name === 'attack')?.base_stat || 50;
+  const def  = stats.find(s => s.stat.name === 'defense')?.base_stat || 50;
+  const spa  = stats.find(s => s.stat.name === 'special-attack')?.base_stat || 50;
+  const spd  = stats.find(s => s.stat.name === 'special-defense')?.base_stat || 50;
+  const spe  = stats.find(s => s.stat.name === 'speed')?.base_stat || 50;
+  const entries = [['atk', atk], ['def', def], ['spa', spa], ['spd', spd], ['spe', spe]];
+  entries.sort((a, b) => b[1] - a[1]);
+  const best = entries[0][0];
+  const natureMap = { atk: 3, def: 8, spe: 13, spa: 15, spd: 24 };
+  return natureMap[best] || 0;
+}
+
+export async function createAndGivePokemon(pokemonName, level, opts = {}) {
+  try {
+    const res = await fetch(`https://pokeapi.co/api/v2/pokemon/${pokemonName}`);
+    if (!res.ok) throw new Error(`PokeAPI returned ${res.status}`);
+    const pokeData = await res.json();
+    const baseHp = pokeData.stats[0].base_stat;
+    const ivs = { hp: 31, atk: 31, def: 31, spa: 31, spd: 31, spe: 31 };
+    const maxHp = Math.floor(0.01 * (2 * baseHp + ivs.hp) * level) + level + 10;
+    const natureIdx = opts.natureIdx !== undefined ? opts.natureIdx : getBestNatureIdx(pokeData);
+    const pokemon = {
+      uid: Date.now().toString(36) + Math.random().toString(36).substr(2, 6),
+      originalTrainer: getTrainerId(),
+      createdAt: Date.now(),
+      caughtLocation: currentLocationId || 'stadium',
+      apiData: pokeData,
+      maxHp, currentHp: maxHp, ivs,
+      evs: { hp: 0, atk: 0, def: 0, spa: 0, spd: 0, spe: 0 },
+      baseLevel: level, exp: 0, expToNext: 8,
+      candiesEaten: 0, vitaminsEaten: 0,
+      training: null, trainingStage: 0, trainingStat: null,
+      happiness: 120, natureIdx,
+      breedLetter: 'S', gender: Math.random() < 0.5 ? 'male' : 'female',
+      status: null, sleepTurns: 0, movesPP: [],
+      statStages: { atk: 0, def: 0, spa: 0, spd: 0, spe: 0 },
+      abilityName: pokeData.abilities[0]?.ability?.name || null,
+      heldItem: null,
+      berries: { sitrusBerry: 0, oranBerry: 0, lumBerry: 0, chestoBerry: 0, rawstBerry: 0 },
+      learnableMoves: [], isEgg: false, hasBred: false,
+      isShiny: !!opts.isShiny
+    };
+    myTeam.push(pokemon);
+    if (myTeam.length <= 6) renderTeamGrid();
+    return pokemon;
+  } catch (e) {
+    console.error('createAndGivePokemon error:', e);
+    showToast('Ошибка создания покемона!', true);
+    return null;
+  }
+}
+
+export function showGymRewardSelection(locId) {
+  const leader = gymLeaders[locId];
+  if (!leader || !leader.team) return;
+  const choices = leader.team.map(m => ({
+    label: `🔑 Lv.1 ${m.name}`,
+    subtitle: `Тот же покемон, что был в бою — Lv.1, шини, идеальные гены`,
+    value: m.name
+  }));
+  showSelectionModal('🎉 Выберите покемона лидера в награду!', choices, async (idx) => {
+    const chosenName = choices[idx]?.value;
+    if (!chosenName) return;
+    // createAndGivePokemon auto-computes best nature from stats
+    const mon = await createAndGivePokemon(chosenName, 1, { isShiny: true });
+    if (mon) {
+      addItem(leader.rewardItem, leader.rewardQty || 1);
+      addItem('superDarkBall', 10);
+      showToast(`Получен Lv.1 ${chosenName} (шини!) + ${itemDef(leader.rewardItem).nameRu} + Супердаркбол×10!`);
+    }
+    autoSave();
+    if (typeof renderTeamGrid === 'function') renderTeamGrid();
+  }, true);
 }
 
 // --- TEAM ROSTER ---
@@ -2908,16 +3045,16 @@ function getSpriteUrl(mon) {
       || '';
 }
 
-function updateBattleSpriteBgs() {
+export function updateBattleSpriteBgs(playerMon, wildMon) {
   const playerBox = document.getElementById('player-sprite')?.closest('.reborn-sprite-box');
-  if (playerBox && activePlayerMon?.apiData?.types) {
-    playerBox.style.background = getTypeGradient(activePlayerMon.apiData.types);
+  if (playerBox && playerMon?.apiData?.types) {
+    playerBox.style.background = getTypeGradient(playerMon.apiData.types);
   }
   const wildBox = document.getElementById('wild-sprite')?.closest('.reborn-sprite-box');
-  if (wildBox && activeWild?.types) {
-    wildBox.style.background = getTypeGradient(activeWild.types);
+  if (wildBox && wildMon?.types) {
+    wildBox.style.background = getTypeGradient(wildMon.types);
   }
-  updateBattleHeldIcons();
+  updateBattleHeldIcons(playerMon, wildMon);
 }
 
 const HELD_ITEM_ICONS = {
@@ -2928,11 +3065,11 @@ const HELD_ITEM_ICONS = {
   rawst: '🍓'
 };
 
-function updateBattleHeldIcons() {
+function updateBattleHeldIcons(playerMon, wildMon) {
   const playerIcon = document.getElementById('player-held-icon');
   const wildIcon = document.getElementById('wild-held-icon');
   if (playerIcon) {
-    const itemId = activePlayerMon?.heldItem;
+    const itemId = playerMon?.heldItem;
     if (itemId && HELD_ITEM_ICONS[itemId]) {
       playerIcon.innerText = HELD_ITEM_ICONS[itemId];
       playerIcon.style.display = '';
@@ -2942,7 +3079,7 @@ function updateBattleHeldIcons() {
     }
   }
   if (wildIcon) {
-    const itemId = activeWild?.heldItem;
+    const itemId = wildMon?.heldItem;
     if (itemId && HELD_ITEM_ICONS[itemId]) {
       wildIcon.innerText = HELD_ITEM_ICONS[itemId];
       wildIcon.style.display = '';
@@ -3269,10 +3406,10 @@ function applyCloudSave(data) {
   currentLocationId = data.currentLocationId || currentLocationId;
   currentRegion = data.currentRegion || currentRegion;
   if (currentRegion === 'tevas_islands') currentRegion = 'southern_archipelago';
-  if (!REGIONS[currentRegion]) currentRegion = 'kanto';
+  if (!REGIONS[currentRegion]) currentRegion = 'east_johto';
   if (!getLocation(currentLocationId)) {
-    currentLocationId = 'pallet_town';
-    currentRegion = 'kanto';
+    currentLocationId = 'goldenrod';
+    currentRegion = 'east_johto';
   }
   if (data.inventory) inventory = { ...data.inventory };
   money = data.money ?? money;
@@ -3593,6 +3730,7 @@ export async function openTrainerProfile(userId) {
       teamEl.appendChild(div);
     });
   } catch (e) {
+    console.error('Trainer profile error:', e);
     document.getElementById('modal-trainer-name').innerText = 'Ошибка загрузки';
   }
 }

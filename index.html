@@ -40,9 +40,98 @@
             <div class="location-image" id="loc-image"></div>
             <h2 class="location-name" id="loc-name">Вермилион</h2>
             <p class="location-region" id="loc-region">Канто</p>
-            <p class="location-desc" id="loc-desc">Портовый город, в который мы попадаем после путешествия из Джото.</p>
-            <p class="location-weather" id="loc-weather">☀️ Ясно</p>
-            
+
+            <div class="loc-tabs">
+              <span class="loc-tab active" data-tab="desc">Описание</span>
+              <span class="loc-tab" data-tab="wild">Дикая природа</span>
+              <span class="loc-tab" data-tab="guide">Пособие</span>
+            </div>
+
+            <div class="loc-tab-content" id="loc-tab-desc">
+              <p class="location-desc" id="loc-desc">Портовый город, в который мы попадаем после путешествия из Джото.</p>
+              <p class="location-weather" id="loc-weather">☀️ Ясно</p>
+            </div>
+
+            <div class="loc-tab-content" id="loc-tab-wild" style="display:none;">
+              <div class="loc-wildlife" id="loc-wildlife" style="display:none;">
+                <div class="loc-wildlife-summary" id="loc-wildlife-summary"></div>
+                <div class="loc-wildlife-detail" id="loc-wildlife-detail"></div>
+              </div>
+              <p class="loc-wildlife-empty" id="loc-wildlife-empty" style="display:none;font-size:0.85rem;opacity:0.6;">Нет диких покемонов</p>
+            </div>
+
+            <div class="loc-tab-content" id="loc-tab-guide" style="display:none;">
+              <div class="guide-content">
+                <details>
+                  <summary>⚔️ Эффективность типов</summary>
+                  <div class="guide-section">
+                    <div class="guide-grid">
+                      <span class="guide-type" style="color:#ff4500">Огонь</span> <span class="guide-effect">x2: Трава, Лёд, Сталь, Жук</span> <span class="guide-effect">x½: Огонь, Вода, Камень, Дракон</span>
+                      <span class="guide-type" style="color:#0070dd">Вода</span> <span class="guide-effect">x2: Огонь, Земля, Камень</span> <span class="guide-effect">x½: Вода, Трава, Дракон</span>
+                      <span class="guide-type" style="color:#00a000">Трава</span> <span class="guide-effect">x2: Вода, Земля, Камень</span> <span class="guide-effect">x½: Огонь, Трава, Яд, Лёт, Дракон, Сталь</span>
+                      <span class="guide-type" style="color:#a08020">Электричество</span> <span class="guide-effect">x2: Вода, Лёт</span> <span class="guide-effect">x½: Электричество, Трава, Дракон</span> <span class="guide-effect">x0: Земля</span>
+                      <span class="guide-type" style="color:#c03028">Психика</span> <span class="guide-effect">x2: Яд, Бой</span> <span class="guide-effect">x½: Психика, Сталь</span> <span class="guide-effect">x0: Тьма</span>
+                      <span class="guide-type" style="color:#a040a0">Яд</span> <span class="guide-effect">x2: Трава, Фея</span> <span class="guide-effect">x½: Яд, Земля, Камень, Призрак</span> <span class="guide-effect">x0: Сталь</span>
+                      <span class="guide-type" style="color:#7038f8">Призрак</span> <span class="guide-effect">x2: Психика, Призрак</span> <span class="guide-effect">x½: Тьма</span> <span class="guide-effect">x0: Нормал</span>
+                      <span class="guide-type" style="color:#909090">Сталь</span> <span class="guide-effect">x2: Лёд, Камень, Фея</span> <span class="guide-effect">x½: Огонь, Вода, Электричество, Сталь</span>
+                      <span class="guide-type" style="color:#58a0f0">Лёт</span> <span class="guide-effect">x2: Трава, Бой, Жук</span> <span class="guide-effect">x½: Электричество, Камень, Сталь</span>
+                      <span class="guide-type" style="color:#e0c068">Земля</span> <span class="guide-effect">x2: Огонь, Электричество, Яд, Камень, Сталь</span> <span class="guide-effect">x½: Трава, Жук</span> <span class="guide-effect">x0: Лёт</span>
+                      <span class="guide-type" style="color:#b8a038">Бой</span> <span class="guide-effect">x2: Нормал, Лёд, Камень, Тьма, Сталь</span> <span class="guide-effect">x½: Яд, Лёт, Психика, Жук</span> <span class="guide-effect">x0: Призрак</span>
+                      <span class="guide-type" style="color:#a8b820">Жук</span> <span class="guide-effect">x2: Трава, Психика, Тьма</span> <span class="guide-effect">x½: Огонь, Бой, Яд, Лёт, Призрак, Сталь</span>
+                      <span class="guide-type" style="color:#f85888">Лёд</span> <span class="guide-effect">x2: Трава, Земля, Лёт, Дракон</span> <span class="guide-effect">x½: Огонь, Вода, Лёд, Сталь</span>
+                      <span class="guide-type" style="color:#7038f8">Дракон</span> <span class="guide-effect">x2: Дракон</span> <span class="guide-effect">x½: Сталь</span> <span class="guide-effect">x0: Фея</span>
+                      <span class="guide-type" style="color:#705848">Тьма</span> <span class="guide-effect">x2: Психика, Призрак</span> <span class="guide-effect">x½: Бой, Тьма, Фея</span>
+                      <span class="guide-type" style="color:#ee99ac">Фея</span> <span class="guide-effect">x2: Бой, Дракон, Тьма</span> <span class="guide-effect">x½: Огонь, Яд, Сталь</span>
+                    </div>
+                  </div>
+                </details>
+                <details>
+                  <summary>🌀 Статусы</summary>
+                  <div class="guide-section">
+                    <div class="guide-grid"><span class="guide-type">🌿 Яд</span> <span class="guide-effect">Каждый ход -⅛ HP</span> <span class="guide-type">🔥 Ожог</span> <span class="guide-effect">Каждый ход -⅛ HP, физ.атака x½</span></div>
+                    <div class="guide-grid"><span class="guide-type">💤 Сон</span> <span class="guide-effect">Не может ходить 1-3 хода</span> <span class="guide-type">🧊 Заморозка</span> <span class="guide-effect">Не может ходить (шанс оттаять 20%)</span></div>
+                    <div class="guide-grid"><span class="guide-type">⚡ Паралич</span> <span class="guide-effect">Скорость x¼, 25% пропуска хода</span> <span class="guide-type">💫 Смятение</span> <span class="guide-effect">50% атакует себя</span></div>
+                  </div>
+                </details>
+                <details>
+                  <summary>📈 Тренировки</summary>
+                  <div class="guide-section">
+                    <div class="guide-grid">
+                      <span class="guide-type">▲ Ур.1-2</span> <span class="guide-effect">+5-10% к лучшей стате</span>
+                      <span class="guide-type">◆ Ур.3-4</span> <span class="guide-effect">+15-25% к лучшей стате</span>
+                    </div>
+                    <div class="guide-grid">
+                      <span class="guide-type">⭐ Ур.5-6</span> <span class="guide-effect">+30-40% к лучшей стате</span>
+                      <span class="guide-type">🏆 Гим лидеры</span> <span class="guide-effect">Уровень тренировки зависит от сложности зала</span>
+                    </div>
+                  </div>
+                </details>
+                <details>
+                  <summary>🌤️ Погода</summary>
+                  <div class="guide-section">
+                    <div class="guide-grid">
+                      <span class="guide-type">☀️ Солнце</span> <span class="guide-effect">Огонь x1.5, Вода x0.5</span>
+                      <span class="guide-type">🌧️ Дождь</span> <span class="guide-effect">Вода x1.5, Огонь x0.5</span>
+                    </div>
+                    <div class="guide-grid">
+                      <span class="guide-type">❄️ Снег</span> <span class="guide-effect">Лёд x1.5</span>
+                      <span class="guide-type">⛰️ Песок</span> <span class="guide-effect">Камень x1.5</span>
+                    </div>
+                  </div>
+                </details>
+                <details>
+                  <summary>⚙️ Механики</summary>
+                  <div class="guide-section">
+                    <div class="guide-grid"><span class="guide-type">🥚 Яйца</span> <span class="guide-effect">Совместимые покемоны в питомнике могут дать яйцо</span></div>
+                    <div class="guide-grid"><span class="guide-type">🔄 Эволюция</span> <span class="guide-effect">Некоторые покемоны эволюционируют при достижении уровня, использовании камней или обмене</span></div>
+                    <div class="guide-grid"><span class="guide-type">🎣 Рыбалка</span> <span class="guide-effect">На локациях с водой можно ловить водных покемонов удочкой</span></div>
+                    <div class="guide-grid"><span class="guide-type">🏅 Значки</span> <span class="guide-effect">Побеждайте гим лидеров — каждый даёт значок и награду</span></div>
+                    <div class="guide-grid"><span class="guide-type">🎯 Дроп</span> <span class="guide-effect">Дикие покемоны могут ронять предметы — смотри вкладку «Дикая природа»</span></div>
+                  </div>
+                </details>
+              </div>
+            </div>
+
             <div class="location-actions" id="loc-actions">
               <!-- Dynamically injected (Heal, Hunt, Shop) -->
             </div>
@@ -442,6 +531,7 @@
           
           <div class="reborn-gym-info" id="battle-gym-info" style="display:none;">
             <span id="gym-leader-battle-name" class="reborn-gym-badge">Лидер: Брок</span>
+            <span id="gym-training-display" class="reborn-gym-training"></span>
           </div>
 
           <div class="reborn-controls" id="battle-main-menu">
@@ -499,7 +589,8 @@
           <h3 id="gym-leader-name">Брок</h3>
           <p id="gym-leader-title">Лидер Зала Пьютера</p>
           <p id="gym-leader-type">Тип: Камень</p>
-          <p id="gym-reward">Награда: Badge + ¥1500</p>
+          <p><span id="gym-leader-badge-icon" style="font-size:1.4em;"></span> <span id="gym-reward">Награда: Badge + ¥1500</span></p>
+          <p id="gym-training-info" style="font-size:0.8rem;margin-top:4px;"></p>
         </div>
         <div class="gym-team-section">
           <h4>Команда лидера:</h4>

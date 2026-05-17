@@ -76,7 +76,7 @@ router.get('/trainers', async (req, res) => {
 });
 
 // Get public profile for a trainer (public)
-router.get('/profile/:userId', async (req, res) => {
+router.get('/:userId', async (req, res) => {
   try {
     const db = getDB();
     const userId = parseInt(req.params.userId);

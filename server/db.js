@@ -118,3 +118,13 @@ export async function initDB(retries = 3) {
 export function getDB() {
   return db;
 }
+
+export async function closeDB() {
+  if (db) {
+    try {
+      await db.exec('PRAGMA wal_checkpoint(TRUNCATE)');
+    } catch (e) { /* ignore */ }
+    await db.close();
+    db = null;
+  }
+}

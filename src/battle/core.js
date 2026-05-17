@@ -1,9 +1,11 @@
 console.log("CORE.JS START");
 import {
   getLocation, showToast, showSelectionModal, addItem, removeItem, getItemQty, itemDef, autoSave, updateMoneyDisplay, modifyMoney, updateInventoryDisplay, checkEvolution, triggerEvolution, lsKey, checkTutorialProgress,
-  getGameState
+  getGameState, updateBattleSpriteBgs, showGymRewardSelection
 } from '../../main.js';
 import { natures } from '../data/natures.js';
+import { ITEMS } from '../data/items.js';
+import { checkNewMovesOnLevelUp } from '../ui/levelup_moves.js';
 
 // === BATTLE STATE ===
 let activeWild = null;
@@ -227,7 +229,7 @@ function renderBattleUI() {
   const playerSpriteUrl = activePlayerMon.apiData.sprites?.other?.['official-artwork']?.front_default || activePlayerMon.apiData.sprites.front_default;
   document.getElementById('player-sprite').src = playerSpriteUrl;
   document.getElementById('player-status-icon').innerText = getStatusIcon(activePlayerMon.status);
-  updateBattleSpriteBgs();
+  updateBattleSpriteBgs(activePlayerMon, activeWild);
   updatePlayerHpUI();
 }
 const MAX_IV = 70;
@@ -1026,7 +1028,7 @@ async function startHunt(encountersArray) {
     document.getElementById('wild-lvl').innerText = `Lv${wildLvl}`;
     const wildSpriteUrl = activeWild.sprites?.other?.['official-artwork']?.front_default || activeWild.sprites.front_default;
     document.getElementById('wild-sprite').src = wildSpriteUrl;
-    updateBattleSpriteBgs();
+    updateBattleSpriteBgs(activePlayerMon, activeWild);
     document.getElementById('wild-status-icon').innerText = '';
     updateWildHpUI();
 
@@ -1034,7 +1036,7 @@ async function startHunt(encountersArray) {
     document.getElementById('player-lvl').innerText = `Lv${activePlayerMon.baseLevel + activePlayerMon.candiesEaten}`;
     const playerSpriteUrl = activePlayerMon.apiData.sprites?.other?.['official-artwork']?.front_default || activePlayerMon.apiData.sprites.front_default;
     document.getElementById('player-sprite').src = playerSpriteUrl;
-    updateBattleSpriteBgs();
+    updateBattleSpriteBgs(activePlayerMon, activeWild);
     document.getElementById('player-status-icon').innerText = getStatusIcon(activePlayerMon.status);
     updatePlayerHpUI();
 
@@ -1486,7 +1488,7 @@ function handlePlayerFaint() {
     document.getElementById('player-lvl').innerText = `Lv${activePlayerMon.baseLevel + activePlayerMon.candiesEaten}`;
     const spriteUrl = activePlayerMon.apiData.sprites?.other?.['official-artwork']?.front_default || activePlayerMon.apiData.sprites.front_default;
     document.getElementById('player-sprite').src = spriteUrl;
-    updateBattleSpriteBgs();
+    updateBattleSpriteBgs(activePlayerMon, activeWild);
     document.getElementById('player-status-icon').innerText = getStatusIcon(activePlayerMon.status);
     updatePlayerHpUI();
 
@@ -2026,18 +2028,55 @@ function openGymModal(locId) {
   document.getElementById('gym-leader-name').innerText = leader.name;
   document.getElementById('gym-leader-title').innerText = leader.title;
   document.getElementById('gym-leader-type').innerText = `Тип: ${leader.type}`;
-  document.getElementById('gym-reward').innerText = `Награда: ${leader.badgeName} + ¥${leader.moneyReward}`;
+  document.getElementById('gym-leader-badge-icon').innerText = leader.badgeIcon || '🏅';
+  const rewardItemName = itemDef(leader.rewardItem)?.nameRu || leader.rewardItem;
+  document.getElementById('gym-reward').innerText = `${leader.badgeIcon || '🏅'} ${leader.badgeName} + ¥${leader.moneyReward} + ${rewardItemName}`;
+
+  // Training display
+  const trainInfo = document.getElementById('gym-training-info');
+  const stageSymbols = ['','▲','▲','◆','◆','⭐','⭐'];
+  const stageNames = ['','Начальная','Расширенная','Мастерская','Знаменитая','Легендарная','Именная'];
+  if (leader.trainingStage) {
+    const sym = stageSymbols[leader.trainingStage] || '▲';
+    trainInfo.innerHTML = `${sym} Тренировка покемонов: <b>${stageNames[leader.trainingStage] || ''}</b> (+${[0,10,18,25,31,36,40][leader.trainingStage]}% к статам)`;
+  } else {
+    trainInfo.innerHTML = '';
+  }
 
   const teamList = document.getElementById('gym-team-list');
   teamList.innerHTML = '';
   leader.team.forEach((member, i) => {
     const li = document.createElement('li');
-    li.innerText = `${member.name} Lv${member.level}`;
+    const sym = leader.trainingStage ? (stageSymbols[leader.trainingStage] || '▲') + ' ' : '';
+    li.innerText = `${sym}${member.name} Lv${member.level}`;
     teamList.appendChild(li);
   });
 
   modal.style.display = 'flex';
   document.getElementById('btn-start-gym-battle').onclick = () => {
+    // Validate team before battle
+    const team = GS.myTeam.filter(m => m.currentHp > 0);
+    if (team.length < 4) {
+      showToast('У вас должно быть минимум 4 живых покемона для битвы с лидером!', true);
+      return;
+    }
+    // Check level cap: no pokemon above gym leader's level
+    const maxGymLvl = Math.max(...leader.team.map(m => m.level));
+    const overleveled = team.filter(m => (m.baseLevel + (m.candiesEaten || 0)) > maxGymLvl);
+    if (overleveled.length > 0) {
+      const names = overleveled.map(m => m.nickname || m.apiData?.name || '?').join(', ');
+      showToast(`Ваши покемоны выше уровнем, чем лидер! Уберите: ${names} (макс ${maxGymLvl} лв)`, true);
+      return;
+    }
+    // Check type duplicates: each pokemon must have a unique primary type
+    const primaryTypes = team.map(m => m.apiData?.types?.[0]?.type?.name).filter(Boolean);
+    const dupes = primaryTypes.filter((t, i) => primaryTypes.indexOf(t) !== i);
+    if (dupes.length > 0) {
+      const uniqueDupes = [...new Set(dupes)].join(', ');
+      showToast(`В команде есть повторяющиеся типы: ${uniqueDupes}. Смените покемонов!`, true);
+      return;
+    }
+
     modal.style.display = 'none';
     startGymBattle(locId);
   };
@@ -2077,14 +2116,23 @@ async function startGymBattle(locId) {
   document.getElementById('player-lvl').innerText = `Lv${activePlayerMon.baseLevel + activePlayerMon.candiesEaten}`;
   const playerSpriteUrl = activePlayerMon.apiData.sprites?.other?.['official-artwork']?.front_default || activePlayerMon.apiData.sprites.front_default;
   document.getElementById('player-sprite').src = playerSpriteUrl;
-  updateBattleSpriteBgs();
+  updateBattleSpriteBgs(activePlayerMon, activeWild);
   document.getElementById('player-status-icon').innerText = getStatusIcon(activePlayerMon.status);
 
   const modal = document.getElementById('encounter-modal');
   document.getElementById('battle-main-menu').style.display = 'flex';
   document.getElementById('battle-end-menu').style.display = 'none';
   document.getElementById('battle-gym-info').style.display = 'block';
-  document.getElementById('gym-leader-battle-name').innerText = `Лидер: ${leader.name}`;
+  const stageSymbols = ['','▲','▲','◆','◆','⭐','⭐'];
+  const stageSym = stageSymbols[leader.trainingStage] || '';
+  document.getElementById('gym-leader-battle-name').innerText = `Лидер: ${leader.name} ${stageSym}`;
+  const trainEl = document.getElementById('gym-training-display');
+  if (leader.trainingStage) {
+    const stageName = ['','Начальная','Расширенная','Мастерская','Знаменитая','Легендарная','Именная'][leader.trainingStage] || '';
+    trainEl.innerText = `⚡Тренировка: ${stageName} (+${[0,10,18,25,31,36,40][leader.trainingStage]}%)`;
+  } else {
+    trainEl.innerText = '';
+  }
   appendToLog(`Вызов лидера ${leader.name}!`, true);
   modal.style.display = 'flex';
 
@@ -2095,7 +2143,7 @@ async function startGymNextPokemon() {
   if (gymTeamIndex >= gymTeamData.length) {
     // Won the gym battle!
     const leader = GS.gymLeaders[gymLeaderKey];
-    badges.push(leader.badgeName);
+    GS.gymBadges.push(leader.badgeName);
     modifyMoney(leader.moneyReward);
     checkQuestProgress('earn_money', leader.moneyReward);
     appendToLog(`Победа! Вы получили ${leader.badgeName} и ¥${leader.moneyReward}!`);
@@ -2103,7 +2151,8 @@ async function startGymNextPokemon() {
     document.getElementById('battle-end-menu').style.display = 'flex';
     updateMoneyDisplay();
     updateBadgeDisplay();
-    autoSave();
+    // Trigger reward selection modal after a brief pause
+    setTimeout(() => showGymRewardSelection(gymLeaderKey), 300);
     return;
   }
 
@@ -2116,37 +2165,106 @@ async function startGymNextPokemon() {
     wildSleepTurns = 0;
     currentWeather = getDailyWeather(GS.currentLocationId);
 
-    activeWild.wildIVs = {
-      hp: Math.floor(Math.random() * 32),
-      atk: Math.floor(Math.random() * 32),
-      def: Math.floor(Math.random() * 32),
-      spa: Math.floor(Math.random() * 32),
-      spd: Math.floor(Math.random() * 32),
-      spe: Math.floor(Math.random() * 32)
-    };
+    // Perfect IVs for gym leader pokemon
+    activeWild.wildIVs = { hp: 31, atk: 31, def: 31, spa: 31, spd: 31, spe: 31 };
+
+    // Apply gym leader training boost
+    const leaderData = GS.gymLeaders[gymLeaderKey];
+    if (leaderData.trainingStage) {
+      activeWild.trainingStage = leaderData.trainingStage;
+      const statOrder = ['atk','spa','spe','def','spd'];
+      let bestStat = 'atk', bestVal = 0;
+      const statNames = { atk: 'attack', spa: 'special-attack', spe: 'speed', def: 'defense', spd: 'special-defense' };
+      for (const s of statOrder) {
+        const v = activeWild.stats.find(st => st.stat.name === statNames[s])?.base_stat || 0;
+        if (v > bestVal) { bestVal = v; bestStat = s; }
+      }
+      activeWild.trainingStat = bestStat;
+    }
 
     wildMaxHP = calculateStat(activeWild, 'hp', true);
     wildCurHP = wildMaxHP;
     escapeAttempts = 0;
 
-    wildMovesDetailed = [];
-    const movePromises = [];
-    for (let i = 0; i < activeWild.moves.length && i < 20; i++) {
-      movePromises.push(
-        fetch(activeWild.moves[i].move.url).then(r => r.json()).catch(() => null)
-      );
+    // Smart move selection: ensure type coverage, STAB, 1 status move
+    const pokeStats = activeWild.stats;
+    const spAtk = pokeStats.find(s => s.stat.name === 'special-attack')?.base_stat || 50;
+    const atkStat = pokeStats.find(s => s.stat.name === 'attack')?.base_stat || 50;
+    const isSpecialAttacker = spAtk > atkStat;
+    const wildTypes = activeWild.types.map(t => t.type?.name).filter(Boolean);
+    const movePool = activeWild.moves.slice().sort((a, b) => {
+      return (b.version_group_details?.[0]?.level_learned_at || 0) - (a.version_group_details?.[0]?.level_learned_at || 0);
+    }).slice(0, 30);
+    const moveResults3 = (await Promise.all(movePool.map(m =>
+      fetch(m.move.url).then(r => r.json()).catch(() => null)
+    ))).filter(Boolean);
+    // Categorize moves
+    const stabMoves = [], coverageMoves = [], statusMoves = [];
+    for (const m of moveResults3) {
+      const isSpMove = m.damage_class?.name === 'special';
+      const statFit = (isSpecialAttacker && isSpMove) || (!isSpecialAttacker && !isSpMove);
+      const isStab = wildTypes.includes(m.type?.name);
+      if (m.power) {
+        const entry = { move: m, power: m.power, statFit };
+        if (isStab) stabMoves.push(entry);
+        else coverageMoves.push(entry);
+      } else {
+        statusMoves.push(m);
+      }
     }
-    const moveResults = await Promise.all(movePromises);
-    wildMovesDetailed = moveResults.filter(m => m && m.power);
+    // Sort by power, prefering stat-fit moves
+    const sortFn = (a, b) => (b.statFit ? b.power : b.power * 0.8) - (a.statFit ? a.power : a.power * 0.8);
+    stabMoves.sort(sortFn);
+    coverageMoves.sort(sortFn);
+    // Pick best 3 attacking moves: prefer 2 STAB + 1 coverage, avoid duplicate types
+    const chosen = [];
+    const usedTypes = new Set();
+    const picker = (pool, count) => {
+      for (const entry of pool) {
+        if (chosen.length >= count) break;
+        const mType = entry.move.type?.name;
+        if (!usedTypes.has(mType) || chosen.length < 2) {
+          chosen.push(entry.move);
+          usedTypes.add(mType);
+        }
+      }
+    };
+    picker(stabMoves, 2); // at least 1 STAB
+    picker(coverageMoves, 3); // fill with coverage
+    picker(stabMoves, 4); // fallback: any STAB
+    // Add best status move if slot remains
+    if (chosen.length < 4 && statusMoves.length > 0) {
+      const keyStatus = ['will-o-wisp','thunder-wave','toxic','hypnosis','spore','swords-dance','nasty-plot','calm-mind','bulk-up','dragon-dance','agility','recover','roost','moonlight','reflect','light-screen','substitute','protect'];
+      const ranked = statusMoves.map(m => ({ move: m, score: keyStatus.includes(m.name) ? 1 : 0 }));
+      ranked.sort((a, b) => b.score - a.score);
+      chosen.push(ranked[0].move);
+    }
+    // Trim to 4
+    wildMovesDetailed = chosen.slice(0, 4);
     wildMovesPP = wildMovesDetailed.map(m => ({ current: m.pp || 30, max: m.pp || 30 }));
 
     document.getElementById('wild-name').innerText = activeWild.name;
     document.getElementById('wild-lvl').innerText = `Lv${wildLvl}`;
-    const wildSpriteUrl = activeWild.sprites?.other?.['official-artwork']?.front_default || activeWild.sprites.front_default;
+    let wildSpriteUrl;
+    if (battleType === 'gym') {
+      wildSpriteUrl = activeWild.sprites?.other?.['official-artwork']?.front_shiny || activeWild.sprites?.front_shiny || activeWild.sprites?.other?.['official-artwork']?.front_default || activeWild.sprites.front_default;
+    } else {
+      wildSpriteUrl = activeWild.sprites?.other?.['official-artwork']?.front_default || activeWild.sprites.front_default;
+    }
     document.getElementById('wild-sprite').src = wildSpriteUrl;
-    updateBattleSpriteBgs();
+    updateBattleSpriteBgs(activePlayerMon, activeWild);
     document.getElementById('wild-status-icon').innerText = '';
     updateWildHpUI();
+    // Gym visual indicator
+    const wildBox = document.querySelector('#wild-sprite').parentElement;
+    if (battleType === 'gym') {
+      wildBox.classList.add('gym-wild');
+      const stageSymbols = ['','▲','▲','◆','◆','⭐','⭐'];
+      const stageSym = stageSymbols[leaderData.trainingStage] || '';
+      document.getElementById('wild-lvl').innerText = `Lv${wildLvl} ${stageSym}`;
+    } else {
+      wildBox.classList.remove('gym-wild');
+    }
 
     appendToLog(`${GS.gymLeaders[gymLeaderKey].name} выпускает ${activeWild.name}! (${gymTeamIndex + 1}/${gymTeamData.length})`);
 
@@ -2328,56 +2446,59 @@ async function useMoveGym(moveIndex) {
       gymTeamIndexInMember++;
     }
 
-    const baseExp = activeWild.base_experience || 50;
-    let expGain = Math.floor((baseExp * wildLvl) / 7);
-    if (activePlayerMon.heldItem === 'luckyEgg') expGain = Math.floor(expGain * 2.5);
+    // Gym pokemon don't give EXP
+    if (battleType !== 'gym') {
+      const baseExp = activeWild.base_experience || 50;
+      let expGain = Math.floor((baseExp * wildLvl) / 7);
+      if (activePlayerMon.heldItem === 'luckyEgg') expGain = Math.floor(expGain * 2.5);
 
-    if (activePlayerMon.exp === undefined) {
-      activePlayerMon.exp = Math.pow(activePlayerMon.baseLevel, 3);
-      activePlayerMon.expToNext = Math.pow(activePlayerMon.baseLevel + 1, 3);
-    }
-    const mLvl = activePlayerMon.baseLevel + (activePlayerMon.candiesEaten || 0);
-    if (mLvl < 100) {
-      activePlayerMon.exp += expGain;
-      appendToLog(`${activePlayerMon.apiData.name} получил ${expGain} EXP!`);
-    }
+      if (activePlayerMon.exp === undefined) {
+        activePlayerMon.exp = Math.pow(activePlayerMon.baseLevel, 3);
+        activePlayerMon.expToNext = Math.pow(activePlayerMon.baseLevel + 1, 3);
+      }
+      const mLvl = activePlayerMon.baseLevel + (activePlayerMon.candiesEaten || 0);
+      if (mLvl < 100) {
+        activePlayerMon.exp += expGain;
+        appendToLog(`${activePlayerMon.apiData.name} получил ${expGain} EXP!`);
+      }
 
-    if (GS.expShareActive) {
-      const shareExp = Math.floor(expGain / 2);
-      GS.myTeam.forEach(mon => {
-        if (mon !== activePlayerMon && mon.currentHp > 0 && (mon.baseLevel + (mon.candiesEaten || 0)) < 100) {
-          if (mon.exp === undefined) {
-            mon.exp = Math.pow(mon.baseLevel, 3);
-            mon.expToNext = Math.pow(mon.baseLevel + 1, 3);
+      if (GS.expShareActive) {
+        const shareExp = Math.floor(expGain / 2);
+        GS.myTeam.forEach(mon => {
+          if (mon !== activePlayerMon && mon.currentHp > 0 && (mon.baseLevel + (mon.candiesEaten || 0)) < 100) {
+            if (mon.exp === undefined) {
+              mon.exp = Math.pow(mon.baseLevel, 3);
+              mon.expToNext = Math.pow(mon.baseLevel + 1, 3);
+            }
+            mon.exp += shareExp;
+            while (mon.exp >= mon.expToNext && (mon.baseLevel + (mon.candiesEaten || 0)) < 100) {
+              mon.baseLevel++;
+              mon.expToNext = Math.pow(mon.baseLevel + 1, 3);
+              const om = mon.maxHp;
+              mon.maxHp = calculateStat(mon, 'hp', false);
+              mon.currentHp += (mon.maxHp - om);
+            }
           }
-          mon.exp += shareExp;
-          while (mon.exp >= mon.expToNext && (mon.baseLevel + (mon.candiesEaten || 0)) < 100) {
-            mon.baseLevel++;
-            mon.expToNext = Math.pow(mon.baseLevel + 1, 3);
-            const om = mon.maxHp;
-            mon.maxHp = calculateStat(mon, 'hp', false);
-            mon.currentHp += (mon.maxHp - om);
-          }
-        }
-      });
-      if (shareExp > 0) appendToLog(`Остальная команда получила по ${shareExp} EXP!`);
-    }
+        });
+        if (shareExp > 0) appendToLog(`Остальная команда получила по ${shareExp} EXP!`);
+      }
 
-    while (activePlayerMon.exp >= activePlayerMon.expToNext && activePlayerMon.baseLevel < 100) {
-      activePlayerMon.baseLevel++;
-      activePlayerMon.expToNext = Math.pow(activePlayerMon.baseLevel + 1, 3);
-      const oldMax = activePlayerMon.maxHp;
-      const newMax = calculateStat(activePlayerMon, 'hp', false);
-      activePlayerMon.maxHp = newMax;
-      activePlayerMon.currentHp += (newMax - oldMax);
-      appendToLog(`${activePlayerMon.apiData.name} достиг ${activePlayerMon.baseLevel} уровня!`);
-      await checkNewMovesOnLevelUp(activePlayerMon, activePlayerMon.baseLevel);
-    }
+      while (activePlayerMon.exp >= activePlayerMon.expToNext && activePlayerMon.baseLevel < 100) {
+        activePlayerMon.baseLevel++;
+        activePlayerMon.expToNext = Math.pow(activePlayerMon.baseLevel + 1, 3);
+        const oldMax = activePlayerMon.maxHp;
+        const newMax = calculateStat(activePlayerMon, 'hp', false);
+        activePlayerMon.maxHp = newMax;
+        activePlayerMon.currentHp += (newMax - oldMax);
+        appendToLog(`${activePlayerMon.apiData.name} достиг ${activePlayerMon.baseLevel} уровня!`);
+        await checkNewMovesOnLevelUp(activePlayerMon, activePlayerMon.baseLevel);
+      }
 
-    const evoTarget = await checkEvolution(activePlayerMon);
-    if (evoTarget) {
-      await triggerEvolution(activePlayerMon, evoTarget.name);
-      updatePlayerHpUI();
+      const evoTarget = await checkEvolution(activePlayerMon);
+      if (evoTarget) {
+        await triggerEvolution(activePlayerMon, evoTarget.name);
+        updatePlayerHpUI();
+      }
     }
 
     setTimeout(() => {
@@ -2412,16 +2533,21 @@ function enemyTurnGym() {
     return;
   }
 
+  // Smart AI: pick best move by effectiveness × STAB × power
   let chosenMove = null;
   let chosenIdx = -1;
-  for (let attempt = 0; attempt < 20; attempt++) {
-    const idx = Math.floor(Math.random() * wildMovesDetailed.length);
-    if (wildMovesDetailed[idx] && wildMovesDetailed[idx].power) {
-      if (wildMovesPP && wildMovesPP[idx] && wildMovesPP[idx].current <= 0) continue;
-      chosenMove = wildMovesDetailed[idx];
-      chosenIdx = idx;
-      break;
-    }
+  let bestScore = -1;
+  for (let i = 0; i < wildMovesDetailed.length; i++) {
+    const m = wildMovesDetailed[i];
+    if (!m) continue;
+    const hasPP = wildMovesPP && wildMovesPP[i] && wildMovesPP[i].current > 0;
+    if (!hasPP) continue;
+    const power = m.power || 1;
+    const stab = (activeWild.types || []).some(t => t.type?.name === m.type?.name) ? 1.5 : 1.0;
+    const mult = getTypeMultiplier(m.type.name, activePlayerMon.apiData.types);
+    // Include status moves with base score 60 so they're used when no good attack exists
+    const score = m.power ? power * stab * mult : 60 * mult;
+    if (score > bestScore) { bestScore = score; chosenMove = m; chosenIdx = i; }
   }
   if (!chosenMove) {
     chosenMove = { power: 30, damage_class: { name: 'physical' }, type: { name: 'normal' }, name: 'Атака' };
@@ -2521,7 +2647,7 @@ function handleGymPlayerFaint() {
     document.getElementById('player-lvl').innerText = `Lv${activePlayerMon.baseLevel + activePlayerMon.candiesEaten}`;
     const spriteUrl = activePlayerMon.apiData.sprites?.other?.['official-artwork']?.front_default || activePlayerMon.apiData.sprites.front_default;
     document.getElementById('player-sprite').src = spriteUrl;
-    updateBattleSpriteBgs();
+    updateBattleSpriteBgs(activePlayerMon, activeWild);
     document.getElementById('player-status-icon').innerText = getStatusIcon(activePlayerMon.status);
     updatePlayerHpUI();
 
@@ -2585,7 +2711,7 @@ async function startEliteBattle() {
   document.getElementById('player-lvl').innerText = `Lv${activePlayerMon.baseLevel + activePlayerMon.candiesEaten}`;
   const playerSpriteUrl = activePlayerMon.apiData.sprites?.other?.['official-artwork']?.front_default || activePlayerMon.apiData.sprites.front_default;
   document.getElementById('player-sprite').src = playerSpriteUrl;
-  updateBattleSpriteBgs();
+  updateBattleSpriteBgs(activePlayerMon, activeWild);
   document.getElementById('player-status-icon').innerText = getStatusIcon(activePlayerMon.status);
 
   const modal = document.getElementById('encounter-modal');
@@ -2663,7 +2789,7 @@ async function startEliteNextPokemon() {
     document.getElementById('wild-lvl').innerText = `Lv${wildLvl}`;
     const wildSpriteUrl = activeWild.sprites?.other?.['official-artwork']?.front_default || activeWild.sprites.front_default;
     document.getElementById('wild-sprite').src = wildSpriteUrl;
-    updateBattleSpriteBgs();
+    updateBattleSpriteBgs(activePlayerMon, activeWild);
     document.getElementById('wild-status-icon').innerText = '';
     updateWildHpUI();
 
@@ -2684,7 +2810,7 @@ async function startEliteNextPokemon() {
     document.getElementById('player-lvl').innerText = `Lv${activePlayerMon.baseLevel + activePlayerMon.candiesEaten}`;
     const playerSpriteUrl = activePlayerMon.apiData.sprites?.other?.['official-artwork']?.front_default || activePlayerMon.apiData.sprites.front_default;
     document.getElementById('player-sprite').src = playerSpriteUrl;
-    updateBattleSpriteBgs();
+    updateBattleSpriteBgs(activePlayerMon, activeWild);
     document.getElementById('player-status-icon').innerText = getStatusIcon(activePlayerMon.status);
     updatePlayerHpUI();
     document.getElementById('battle-main-menu').style.display = 'flex';
@@ -2755,7 +2881,7 @@ async function startChampionNextPokemon() {
     document.getElementById('wild-lvl').innerText = `Lv${wildLvl}`;
     const wildSpriteUrl = activeWild.sprites?.other?.['official-artwork']?.front_default || activeWild.sprites.front_default;
     document.getElementById('wild-sprite').src = wildSpriteUrl;
-    updateBattleSpriteBgs();
+    updateBattleSpriteBgs(activePlayerMon, activeWild);
     document.getElementById('wild-status-icon').innerText = '';
     updateWildHpUI();
 
@@ -2776,7 +2902,7 @@ async function startChampionNextPokemon() {
     document.getElementById('player-lvl').innerText = `Lv${activePlayerMon.baseLevel + activePlayerMon.candiesEaten}`;
     const playerSpriteUrl = activePlayerMon.apiData.sprites?.other?.['official-artwork']?.front_default || activePlayerMon.apiData.sprites.front_default;
     document.getElementById('player-sprite').src = playerSpriteUrl;
-    updateBattleSpriteBgs();
+    updateBattleSpriteBgs(activePlayerMon, activeWild);
     document.getElementById('player-status-icon').innerText = getStatusIcon(activePlayerMon.status);
     updatePlayerHpUI();
     document.getElementById('battle-main-menu').style.display = 'flex';

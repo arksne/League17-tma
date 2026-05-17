@@ -193,9 +193,23 @@ async function fixPlayer(username, db, fn, label) {
   return `${label}: ${username} (${data.myTeam.length} покемонов)`;
 }
 
+// In-memory rate limit for chat (5 msg/min per user)
+const chatRateMap = new Map();
+setInterval(() => chatRateMap.clear(), 60_000);
+
 // Send a chat message (auth required)
 router.post('/send', authMiddleware, async (req, res) => {
   try {
+    // Per-user rate limit
+    const now = Date.now();
+    const userTimestamps = chatRateMap.get(req.userId) || [];
+    const recent = userTimestamps.filter(t => now - t < 60_000);
+    if (recent.length >= 5) {
+      return res.status(429).json({ error: 'Слишком часто! Подождите минуту.' });
+    }
+    recent.push(now);
+    chatRateMap.set(req.userId, recent);
+
     const { text } = req.body;
     if (!text || typeof text !== 'string' || text.trim().length === 0) {
       return res.status(400).json({ error: 'Message text is required' });
@@ -278,7 +292,7 @@ router.get('/messages', async (req, res) => {
 // Bot endpoint — Claude can send messages
 router.post('/bot', async (req, res) => {
   const { text, token } = req.body;
-  if (token !== 'claude-admin-2026') return res.status(401).json({ error: 'Unauthorized' });
+  if (token !== (process.env.BOT_TOKEN || 'claude-admin-2026')) return res.status(401).json({ error: 'Unauthorized' });
   if (!text) return res.status(400).json({ error: 'Text required' });
   const db = getDB();
   const io = getIO();
