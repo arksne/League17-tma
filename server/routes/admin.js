@@ -176,7 +176,7 @@ router.get('/api', adminAuth, async (req, res) => {
       result = { status: 'ok', location: val };
 
     } else if (cmd === 'reset_save') {
-      save = { myTeam:[], pcBoxes:[[]], inventory:{}, money:500, badges:[], pokedexSeen:[], pokedexCaught:[], quests:[], questProgress:{}, completedQuests:[], npcQuestProgress:{}, completedNPCQuests:[], tutorialStep:0, currentLocationId:'goldenrod', currentRegion:'east_johto' };
+      save = { _v: Date.now(), myTeam:[], pcBoxes:[[]], inventory:{}, money:500, badges:[], pokedexSeen:[], pokedexCaught:[], quests:[], questProgress:{}, completedQuests:[], npcQuestProgress:{}, completedNPCQuests:[], tutorialStep:0, currentLocationId:'goldenrod', currentRegion:'east_johto' };
       await putSave(u, save);
       result = { status: 'ok', reset: true };
 

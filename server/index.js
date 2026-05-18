@@ -62,9 +62,9 @@ app.get('/api/health', async (req, res) => {
   }
 });
 
-// Serve static files
-app.use(express.static(path.join(__dirname, '../dist')));
-app.use('/avatars', express.static(path.join(__dirname, '../public/avatars')));
+// Serve static files with caching (reduce 429s on assets)
+app.use(express.static(path.join(__dirname, '../dist'), { maxAge: '1d', immutable: true }));
+app.use('/avatars', express.static(path.join(__dirname, '../public/avatars'), { maxAge: '1d' }));
 
 // SPA fallback — must be AFTER static but BEFORE error handler
 app.use((req, res, next) => {

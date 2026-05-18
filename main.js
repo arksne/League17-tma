@@ -915,6 +915,8 @@ let visitedLocations = new Set();
 let tgUser = null;
 let tgToken = null;
 let cloudSaveTimer = null;
+let saveInProgress = false;
+let saveTriggerPending = false;
 export const API_BASE = '/api';
 // Admin Telegram IDs + usernames
 const ADMIN_IDS = new Set([1394113078]);
@@ -948,7 +950,8 @@ document.addEventListener('DOMContentLoaded', async () => {
   if (tgToken) {
     // Always check cloud first — it's the source of truth
     const cloudData = await cloudLoad();
-    if (cloudData && cloudData.myTeam && cloudData.myTeam.length > 0) {
+    // Cloud is source of truth — apply even if myTeam is empty (e.g. admin reset)
+    if (cloudData && cloudData.myTeam) {
       applyCloudSave(cloudData);
       saveGame(); // sync to localStorage
       gameLoaded = true;
@@ -1759,8 +1762,8 @@ function craftItem(recipeId) {
 let saveVersion = 0;
 let lastCloudSync = 0;
 let saveRetryCount = 0;
-const MAX_RETRIES = 5;
-const RETRY_DELAYS = [2000, 4000, 8000, 16000, 32000];
+const MAX_RETRIES = 3;
+const RETRY_DELAYS = [5000, 15000, 30000];
 
 function getFullSaveData() {
   return {
@@ -3519,11 +3522,20 @@ function getLeaderboardData() {
 
 function cloudSave() {
   if (!tgToken) return;
+  // If a save is in flight, mark pending — it'll fire right after the current one
+  if (saveInProgress) {
+    saveTriggerPending = true;
+    return;
+  }
   if (cloudSaveTimer) clearTimeout(cloudSaveTimer);
   cloudSaveTimer = setTimeout(() => doCloudSave(), 2000);
 }
 
 async function doCloudSave(attempt = 0) {
+  if (saveInProgress) return; // already saving, coalesced call will pick it up
+  saveInProgress = true;
+  saveTriggerPending = false;
+
   validateGameState();
   const saveData = getFullSaveData();
   const lb = getLeaderboardData();
@@ -3534,6 +3546,14 @@ async function doCloudSave(attempt = 0) {
       headers: getCloudAuthHeaders(),
       body: JSON.stringify({ saveData, ...lb, saveVersion })
     });
+    // 429 = rate limited — don't retry, just stop hammering the server
+    if (res.status === 429) {
+      console.warn('Cloud save rate-limited (429), backing off');
+      saveInProgress = false;
+      const btnSync = document.getElementById('btn-cloud-sync');
+      if (btnSync) { btnSync.textContent = '☁️✗'; setTimeout(() => { btnSync.textContent = '☁️ Авто'; }, 5000); }
+      return;
+    }
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const result = await res.json();
     lastCloudSync = Date.now();
@@ -3546,13 +3566,22 @@ async function doCloudSave(attempt = 0) {
     console.warn(`Cloud save failed (attempt ${attempt + 1}/${MAX_RETRIES})`, e.message);
     if (attempt < MAX_RETRIES - 1) {
       saveRetryCount = attempt + 1;
+      saveInProgress = false;
       const delay = RETRY_DELAYS[attempt];
-      setTimeout(() => doCloudSave(attempt + 1), delay);
+      cloudSaveTimer = setTimeout(() => doCloudSave(attempt + 1), delay);
+      return;
     } else {
       saveRetryCount = MAX_RETRIES;
       const btnSync = document.getElementById('btn-cloud-sync');
       if (btnSync) { btnSync.textContent = '☁️✗'; setTimeout(() => { btnSync.textContent = '☁️ Авто'; }, 3000); }
     }
+  }
+  saveInProgress = false;
+
+  // If another save was triggered while we were saving, fire it now
+  if (saveTriggerPending) {
+    saveTriggerPending = false;
+    cloudSaveTimer = setTimeout(() => doCloudSave(), 500);
   }
 }
 
@@ -3571,8 +3600,9 @@ async function cloudLoad() {
 
 function applyCloudSave(data) {
   if (!data || !data.myTeam) return;
-  const cloudV = data._v || 0;
-  if (cloudV <= saveVersion) return; // Server is older or same — skip
+  // _v may be undefined on admin-reset saves — treat those as authoritative
+  const cloudV = data._v;
+  if (cloudV !== undefined && cloudV > 0 && cloudV <= saveVersion) return;
 
   // Server has newer data — use it
   console.log(`[sync] Server v${cloudV} > local v${saveVersion} — applying server data`);
@@ -3616,7 +3646,7 @@ function applyCloudSave(data) {
   visitedLocations = new Set(data.visitedLocations || []);
   itemsUsedInBattle = data.itemsUsedInBattle || itemsUsedInBattle;
   itemHistory = data.itemHistory || itemHistory;
-  saveVersion = cloudV;
+  saveVersion = cloudV !== undefined ? cloudV : Date.now();
   validateGameState();
 
   // Save reconciled state locally
