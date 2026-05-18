@@ -19,7 +19,10 @@ router.post('/tg', async (req, res) => {
     const isRealInitData = initData && initData !== 'test';
     let tgUser;
 
-    if (!isRealInitData) {
+    // Custom test user via JSON initData (for multi-trainer Playwright testing)
+    if (initData && initData.startsWith('{')) {
+      tgUser = parseTestUser(initData);
+    } else if (!isRealInitData) {
       // Browser/dev access — use test user, no BOT_TOKEN needed
       if (initData === 'test') {
         tgUser = parseTestUser();
