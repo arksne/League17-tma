@@ -1,7 +1,7 @@
 console.log("CORE.JS START");
 import {
   getLocation, showToast, showSelectionModal, addItem, removeItem, getItemQty, itemDef, autoSave, updateMoneyDisplay, modifyMoney, updateInventoryDisplay, checkEvolution, triggerEvolution, lsKey, checkTutorialProgress,
-  getGameState, updateBattleSpriteBgs, showGymRewardSelection, processMonsterDrop
+  getGameState, updateBattleSpriteBgs, showGymRewardSelection, processMonsterDrop, getSpriteUrl
 } from '../../main.js';
 import { natures } from '../data/natures.js';
 import { ITEMS } from '../data/items.js';
@@ -218,14 +218,14 @@ async function restoreBattleState() {
 function renderBattleUI() {
   document.getElementById('wild-name').innerText = activeWild.name;
   document.getElementById('wild-lvl').innerText = `Lv${wildLvl}`;
-  const wildSpriteUrl = activeWild.sprites?.other?.['official-artwork']?.front_default || activeWild.sprites.front_default;
+  const wildSpriteUrl = getSpriteUrl({ isShiny: activeWild.isShiny, apiData: activeWild });
   document.getElementById('wild-sprite').src = wildSpriteUrl;
   document.getElementById('wild-status-icon').innerText = getStatusIcon(wildStatus);
   updateWildHpUI();
 
   document.getElementById('player-name').innerText = activePlayerMon.nickname || activePlayerMon.apiData.name;
   document.getElementById('player-lvl').innerText = `Lv${activePlayerMon.baseLevel + activePlayerMon.candiesEaten}`;
-  const playerSpriteUrl = activePlayerMon.apiData.sprites?.other?.['official-artwork']?.front_default || activePlayerMon.apiData.sprites.front_default;
+  const playerSpriteUrl = getSpriteUrl(activePlayerMon);
   document.getElementById('player-sprite').src = playerSpriteUrl;
   document.getElementById('player-status-icon').innerText = getStatusIcon(activePlayerMon.status);
   updateBattleSpriteBgs(activePlayerMon, activeWild);
@@ -1429,7 +1429,8 @@ async function useMove(moveIndex) {
   if (wildCurHP === 0) {
     appendToLog(`Дикий ${activeWild.name} побежден!`);
     checkQuestProgress('defeat_x');
-    if (Math.random() < 0.10) { addItem('candy'); appendToLog('Вы нашли Сладкую Конфету!', false, 'quest'); }
+    if (Math.random() < 0.03) { addItem('candy'); appendToLog('Вы нашли Сладкую Конфету!', false, 'quest'); }
+    if (Math.random() < 0.03) { addItem('superDarkBall'); appendToLog('Вы нашли Супердаркбол!', false, 'quest'); }
     const dropResults = processMonsterDrop(activeWild.name);
     if (dropResults.length > 0) {
       const dropText = dropResults.map(d => `${d.qty}x ${itemDef(d.item).nameRu}`).join(', ');
@@ -1557,7 +1558,8 @@ function enemyTurn() {
       appendToLog(`${activePlayerMon.apiData.name} достиг ${activePlayerMon.baseLevel} уровня!`);
     }
     checkQuestProgress('defeat_x');
-    if (Math.random() < 0.10) { addItem('candy'); appendToLog('Вы нашли Сладкую Конфету!', false, 'quest'); }
+    if (Math.random() < 0.03) { addItem('candy'); appendToLog('Вы нашли Сладкую Конфету!', false, 'quest'); }
+    if (Math.random() < 0.03) { addItem('superDarkBall'); appendToLog('Вы нашли Супердаркбол!', false, 'quest'); }
     const dropResults = processMonsterDrop(activeWild.name);
     if (dropResults.length > 0) {
       const dropText = dropResults.map(d => `${d.qty}x ${itemDef(d.item).nameRu}`).join(', ');
@@ -2154,7 +2156,7 @@ async function startGymBattle(locId) {
 
   document.getElementById('player-name').innerText = activePlayerMon.nickname || activePlayerMon.apiData.name;
   document.getElementById('player-lvl').innerText = `Lv${activePlayerMon.baseLevel + activePlayerMon.candiesEaten}`;
-  const playerSpriteUrl = activePlayerMon.apiData.sprites?.other?.['official-artwork']?.front_default || activePlayerMon.apiData.sprites.front_default;
+  const playerSpriteUrl = getSpriteUrl(activePlayerMon);
   document.getElementById('player-sprite').src = playerSpriteUrl;
   updateBattleSpriteBgs(activePlayerMon, activeWild);
   document.getElementById('player-status-icon').innerText = getStatusIcon(activePlayerMon.status);
@@ -2759,7 +2761,7 @@ async function startEliteBattle() {
 
   document.getElementById('player-name').innerText = activePlayerMon.nickname || activePlayerMon.apiData.name;
   document.getElementById('player-lvl').innerText = `Lv${activePlayerMon.baseLevel + activePlayerMon.candiesEaten}`;
-  const playerSpriteUrl = activePlayerMon.apiData.sprites?.other?.['official-artwork']?.front_default || activePlayerMon.apiData.sprites.front_default;
+  const playerSpriteUrl = getSpriteUrl(activePlayerMon);
   document.getElementById('player-sprite').src = playerSpriteUrl;
   updateBattleSpriteBgs(activePlayerMon, activeWild);
   document.getElementById('player-status-icon').innerText = getStatusIcon(activePlayerMon.status);

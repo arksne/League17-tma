@@ -2942,7 +2942,7 @@ function renderTeamGrid() {
         slot.innerHTML = `
           ${reorderHtml}
           <div class="team-sprite-wrap">
-            <img src="${mon.apiData.sprites?.other?.['official-artwork']?.front_default || mon.apiData.sprites.front_default}" alt="sprite" style="background:${typeBg};">
+            <img src="${getSpriteUrl(mon)}" alt="sprite" style="background:${typeBg};">
             ${trainLabel}
           </div>
           <div class="slot-name">${escHtml(mon.nickname || mon.apiData.name)} ${statusIcon}</div>
@@ -3125,8 +3125,18 @@ function updateHappinessUI_Profile(mon) {
 }
 
 function updateGenecodeDisplay_Profile(mon) {
-  const vitStr = (mon.vitaminsEaten > 0) ? `.${mon.vitaminsEaten*10}` : '.0';
-  const genecodeStr = `h${mon.ivs.hp}a${mon.ivs.atk}d${mon.ivs.def}s${mon.ivs.spe}sa${mon.ivs.spa}sd${mon.ivs.spd}${vitStr}${mon.breedLetter}`;
+  const iv = mon.ivs;
+  const ev = mon.evs;
+  const candyStr = `c${mon.candiesEaten || 0}`;
+  const vitStr = `v${(mon.vitaminsEaten || 0) * 10}`;
+  const hapStr = `h${mon.happiness || 70}`;
+  const lvlStr = `l${(mon.baseLevel || 5) + (mon.candiesEaten || 0)}`;
+  const trainStr = `t${mon.trainingStage || 0}`;
+  const breedStr = `${mon.breedLetter || 'A'}`;
+  const genecodeStr =
+    `h${iv.hp}a${iv.atk}d${iv.def}s${iv.spe}sa${iv.spa}sd${iv.spd}` +
+    `eh${ev.hp}ea${ev.atk}ed${ev.def}es${ev.spe}esa${ev.spa}esd${ev.spd}` +
+    `${candyStr}${vitStr}${hapStr}${lvlStr}${trainStr}${breedStr}`;
   document.getElementById('info-genecode').innerText = genecodeStr;
   // Show UID & original trainer
   const uidEl = document.getElementById('info-uid');
@@ -3207,7 +3217,7 @@ export function getTypeGradient(types) {
   return `radial-gradient(circle at 50% 50%, ${c1}dd 0%, ${c1}55 50%, ${c2}55 80%, ${c2}dd 100%)`;
 }
 
-function getSpriteUrl(mon) {
+export function getSpriteUrl(mon) {
   const api = mon.apiData || mon;
   const isShiny = mon.isShiny || api.isShiny;
   if (isShiny) {
