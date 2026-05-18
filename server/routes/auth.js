@@ -13,10 +13,10 @@ const AVATARS_DIR = path.join(__dirname, '../../public/avatars');
 
 const router = Router();
 
-function generateTrainerId(db) {
+async function generateTrainerId(db) {
   for (let attempt = 0; attempt < 100; attempt++) {
     const id = 100000 + Math.floor(Math.random() * 900000); // 100001–999999
-    const existing = db.get('SELECT id FROM users WHERE trainer_id = ?', id);
+    const existing = await db.get('SELECT id FROM users WHERE trainer_id = ?', id);
     if (!existing) return id;
   }
   // Fallback: use timestamp-based ID (extremely unlikely to reach here)
@@ -57,7 +57,7 @@ router.post('/tg', async (req, res) => {
     let user = await db.get('SELECT * FROM users WHERE telegram_id = ?', telegramId);
 
     if (!user) {
-      const trainerId = generateTrainerId(db);
+      const trainerId = await generateTrainerId(db);
       // Use INSERT OR IGNORE to prevent race condition on concurrent registration
       const result = await db.run(
         'INSERT OR IGNORE INTO users (telegram_id, username, first_name, trainer_id) VALUES (?, ?, ?, ?)',
@@ -73,7 +73,7 @@ router.post('/tg', async (req, res) => {
 
     // Backfill trainer_id for existing users that don't have one yet
     if (user && !user.trainer_id) {
-      const trainerId = generateTrainerId(db);
+      const trainerId = await generateTrainerId(db);
       await db.run('UPDATE users SET trainer_id = ? WHERE id = ?', trainerId, user.id);
       user.trainer_id = trainerId;
     }
