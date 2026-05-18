@@ -793,6 +793,9 @@ body::before {
 .reborn-move-link.move-type-physical { border-left: 3px solid #ff6b4a; }
 .reborn-move-link.move-type-special { border-left: 3px solid #4a9eff; }
 .reborn-move-link.move-type-status { border-left: 3px solid #4ade80; }
+.move-name.move-type-physical { color: #ff6b4a; }
+.move-name.move-type-special { color: #4a9eff; }
+.move-name.move-type-status { color: #4ade80; }
 
 .reborn-actions {
   display: flex;

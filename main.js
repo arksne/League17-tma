@@ -107,6 +107,7 @@ let itemsUsedInBattle = 0;
 let lastLocation = null;
 let currentRegion = 'east_johto';
 let expShareActive = false;
+const moveTypeCache = new Map();
 
 // --- EXISTING PROFILE DATA ---
 
@@ -3006,6 +3007,17 @@ export function refreshProfileUI() {
   const tera = mon.apiData.types[0].type.name;
   document.getElementById('info-tera').innerText = tera.charAt(0).toUpperCase() + tera.slice(1);
 
+  // Nature display with boosted/reduced stats
+  const natureIdx = mon.natureIdx || 0;
+  const nature = natures[natureIdx];
+  if (nature) {
+    const statNames = { 'atk': 'Атака', 'def': 'Защита', 'spa': 'Сп.Атака', 'spd': 'Сп.Защита', 'spe': 'Скорость' };
+    let natureHtml = nature.name;
+    if (nature.buff) natureHtml += ` <span style="color:#4ade80">↑${statNames[nature.buff]}</span>`;
+    if (nature.nerf) natureHtml += ` <span style="color:#ff6b4a">↓${statNames[nature.nerf]}</span>`;
+    document.getElementById('info-nature').innerHTML = natureHtml;
+  }
+
   const heldEl = document.getElementById('info-held-item');
   const heldItemName = getHeldItemName(mon.heldItem);
   heldEl.innerText = heldItemName;
@@ -3021,6 +3033,8 @@ export function refreshProfileUI() {
       const ppDisplay = (mon.movesPP && mon.movesPP[i]) ? `${mon.movesPP[i].current}/${mon.movesPP[i].max}` : '30/30';
       document.getElementById(`move-${i}-name`).innerText = mon.apiData.moves[i].move.name;
       document.getElementById(`move-${i}-pp`).innerText = `PP ${ppDisplay}`;
+      const moveUrl = mon.apiData.moves[i].move.url;
+      if (moveUrl) colorMoveElement(i, moveUrl);
     } else {
       document.getElementById(`move-${i}-name`).innerText = '-';
       document.getElementById(`move-${i}-pp`).innerText = `PP 0/0`;
@@ -3091,6 +3105,19 @@ export function refreshProfileUI() {
 
   updateDynamicEVs();
   updateStats();
+}
+
+async function colorMoveElement(index, moveUrl) {
+  try {
+    if (!moveTypeCache.has(moveUrl)) {
+      const res = await fetch(moveUrl);
+      const data = await res.json();
+      moveTypeCache.set(moveUrl, data.damage_class?.name || 'status');
+    }
+    const dc = moveTypeCache.get(moveUrl);
+    const el = document.getElementById(`move-${index}-name`);
+    if (el) el.classList.add(`move-type-${dc}`);
+  } catch (e) { /* ignore failed move fetch */ }
 }
 
 function updateStatusDisplay_Profile(mon) {

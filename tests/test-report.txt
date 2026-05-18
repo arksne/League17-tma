@@ -1,0 +1,122 @@
+=== MULTI-TRAINER TEST REPORT ===
+
+Starting 10 trainers...
+
+
+=== Batch 1: trainer1, trainer2, trainer3 ===
+── trainer1 (ID 4001) ──
+── trainer2 (ID 4002) ──
+── trainer3 (ID 4003) ──
+  Registration overlay not found (already registered?)
+  Registration overlay not found (already registered?)
+  Registration overlay not found (already registered?)
+  Team: OK (active=true, text=true)
+  Team: OK (active=true, text=true)
+  Team: OK (active=true, text=true)
+  World: OK (active=true, text=true)
+  World: OK (active=true, text=true)
+  World: OK (active=true, text=true)
+  Bag: OK (active=true, text=true)
+  Bag: OK (active=true, text=true)
+  Bag: OK (active=true, text=true)
+  Chat: OK (active=true, text=true)
+  Chat: OK (active=true, text=true)
+  Chat: OK (active=true, text=true)
+  Heal: OK
+  Heal: OK
+  Heal: OK
+  Travel: OK
+  Result: 6/7 OK, 0 failed
+  Travel: OK
+  Result: 6/7 OK, 0 failed
+  Travel: OK
+  Result: 6/7 OK, 0 failed
+  --- Batch done, cooling 5s ---
+
+=== Batch 2: trainer4, trainer5, trainer6 ===
+── trainer4 (ID 4004) ──
+── trainer5 (ID 4005) ──
+── trainer6 (ID 4006) ──
+  Registration overlay not found (already registered?)
+  Registration overlay not found (already registered?)
+  Registration overlay not found (already registered?)
+  Team: OK (active=true, text=true)
+  Team: OK (active=true, text=true)
+  Team: OK (active=true, text=true)
+  World: OK (active=true, text=true)
+  World: OK (active=true, text=true)
+  World: OK (active=true, text=true)
+  Bag: OK (active=true, text=true)
+  Bag: OK (active=true, text=true)
+  Bag: OK (active=true, text=true)
+  Chat: OK (active=true, text=true)
+  Chat: OK (active=true, text=true)
+  Chat: OK (active=true, text=true)
+  Heal: OK
+  Heal: OK
+  Heal: OK
+  Travel: OK
+  Result: 6/7 OK, 0 failed
+  Travel: OK
+  Result: 6/7 OK, 0 failed
+  Travel: OK
+  Result: 6/7 OK, 0 failed
+  --- Batch done, cooling 5s ---
+
+=== Batch 3: trainer7, trainer8, trainer9 ===
+── trainer7 (ID 4007) ──
+── trainer8 (ID 4008) ──
+── trainer9 (ID 4009) ──
+  Registration overlay not found (already registered?)
+  Registration overlay not found (already registered?)
+  Registration overlay not found (already registered?)
+  Team: OK (active=true, text=true)
+  Team: OK (active=true, text=true)
+  Team: OK (active=true, text=true)
+  World: OK (active=true, text=true)
+  World: OK (active=true, text=true)
+  World: OK (active=true, text=true)
+  Bag: OK (active=true, text=true)
+  Bag: OK (active=true, text=true)
+  Bag: OK (active=true, text=true)
+  Chat: OK (active=true, text=true)
+  Chat: OK (active=true, text=true)
+  Chat: OK (active=true, text=true)
+  Heal: OK
+  Heal: OK
+  Heal: OK
+  Travel: OK
+  Result: 6/7 OK, 0 failed
+  Travel: OK
+  Result: 6/7 OK, 0 failed
+  Travel: OK
+  Result: 6/7 OK, 0 failed
+  --- Batch done, cooling 5s ---
+
+=== Batch 4: trainer10 ===
+── trainer10 (ID 4010) ──
+  Registration overlay not found (already registered?)
+  Team: OK (active=true, text=true)
+  World: OK (active=true, text=true)
+  Bag: OK (active=true, text=true)
+  Chat: OK (active=true, text=true)
+  Heal: OK
+  Travel: OK
+  Result: 6/7 OK, 0 failed
+  --- Batch done, cooling 5s ---
+
+
+=== FINAL SUMMARY ===
+  trainer1: 6/7 passed, undefined failed
+  trainer2: 6/7 passed, undefined failed
+  trainer3: 6/7 passed, undefined failed
+  trainer4: 6/7 passed, undefined failed
+  trainer5: 6/7 passed, undefined failed
+  trainer6: 6/7 passed, undefined failed
+  trainer7: 6/7 passed, undefined failed
+  trainer8: 6/7 passed, undefined failed
+  trainer9: 6/7 passed, undefined failed
+  trainer10: 6/7 passed, undefined failed
+
+TOTAL: 60/70 passed, 0 failed
+       86% success rate
