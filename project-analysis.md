@@ -54,7 +54,7 @@ Pokemon-themed Telegram Mini App (TMA). Single-page application (SPA) built with
 | `server/auth.js` | Telegram init data verification (HMAC-SHA256) |
 | `server/routes/auth.js` | Telegram auth → create user → JWT |
 | `server/routes/save.js` | Load/save game data (GET/POST) |
-| `server/routes/admin.js` | Admin panel API (reset, give mon, edit mon, etc.) |
+| `server/routes/admin.js` | Admin panel API (reset, give mon, edit mon, give_egg, broadcast, etc.) |
 | `server/routes/admin.html` | Admin panel UI |
 | `server/routes/chat.js` | Chat bot (Claude AI integration) |
 | `server/routes/leaderboard.js` | Leaderboard |
@@ -164,7 +164,14 @@ Pokemon-themed Telegram Mini App (TMA). Single-page application (SPA) built with
 - Reset user save, give pokemon, edit pokemon by UID
 - Full mon editor: species, level, shiny, gender, nature, HP, held item, IVs, EVs, candies, vitamins, happiness, training, status, breed letter, sterile flag
 - Raw JSON editor for direct save data manipulation
+- Quick actions: give items, money, badges, legendary, **random egg** (added 2026-05-18), heal, max IV, fix levels, teleport, reset
 - Chat bot with Claude AI
+
+### Egg System
+- **Display**: Eggs in inventory show genecode (IV string), type-colored background, egg sprite, hatch timer with ✓ badge when ready
+- **IV Inheritance** (added 2026-05-18): Each IV stat = average of both parents' IVs, then random ±2 (clamped 0-31). Replaces fully-random 0-31.
+- **Admin command**: `give_egg` spawns a random species egg with 1-3 day hatch timer, random IVs. 70+ species in pool.
+- **Cloud save fix** (2026-05-18): `eggs = data.eggs && data.eggs.length > 0 ? data.eggs : eggs` prevents empty server array from wiping local eggs.
 
 ---
 
