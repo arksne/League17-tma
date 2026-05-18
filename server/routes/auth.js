@@ -4,6 +4,7 @@ import { getDB } from '../db.js';
 import { generateToken, authMiddleware } from '../middleware/auth.js';
 import fs from 'fs';
 import path from 'path';
+import crypto from 'crypto';
 import { fileURLToPath } from 'url';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -11,6 +12,16 @@ const __dirname = path.dirname(__filename);
 const AVATARS_DIR = path.join(__dirname, '../../public/avatars');
 
 const router = Router();
+
+function generateTrainerId(db) {
+  for (let attempt = 0; attempt < 100; attempt++) {
+    const id = 100000 + Math.floor(Math.random() * 900000); // 100001–999999
+    const existing = db.get('SELECT id FROM users WHERE trainer_id = ?', id);
+    if (!existing) return id;
+  }
+  // Fallback: use timestamp-based ID (extremely unlikely to reach here)
+  return 900000 + (Date.now() % 100000);
+}
 
 router.post('/tg', async (req, res) => {
   try {
@@ -46,17 +57,25 @@ router.post('/tg', async (req, res) => {
     let user = await db.get('SELECT * FROM users WHERE telegram_id = ?', telegramId);
 
     if (!user) {
+      const trainerId = generateTrainerId(db);
       // Use INSERT OR IGNORE to prevent race condition on concurrent registration
       const result = await db.run(
-        'INSERT OR IGNORE INTO users (telegram_id, username, first_name) VALUES (?, ?, ?)',
-        telegramId, tgUser.username || '', tgUser.first_name || ''
+        'INSERT OR IGNORE INTO users (telegram_id, username, first_name, trainer_id) VALUES (?, ?, ?, ?)',
+        telegramId, tgUser.username || '', tgUser.first_name || '', trainerId
       );
       if (result.lastID) {
-        user = { id: result.lastID, telegram_id: telegramId, username: tgUser.username || '', registered: 0 };
+        user = { id: result.lastID, telegram_id: telegramId, username: tgUser.username || '', registered: 0, trainer_id: trainerId };
       } else {
         // Another concurrent request already inserted — re-fetch
         user = await db.get('SELECT * FROM users WHERE telegram_id = ?', telegramId);
       }
+    }
+
+    // Backfill trainer_id for existing users that don't have one yet
+    if (user && !user.trainer_id) {
+      const trainerId = generateTrainerId(db);
+      await db.run('UPDATE users SET trainer_id = ? WHERE id = ?', trainerId, user.id);
+      user.trainer_id = trainerId;
     }
     if (user) {
       await db.run(
@@ -72,7 +91,8 @@ router.post('/tg', async (req, res) => {
       user: {
         id: user.id, telegram_id: user.telegram_id, username: user.username,
         registered: user.registered || 0, nickname: user.nickname || '',
-        avatar: user.avatar || '👤', starter_pokemon: user.starter_pokemon || ''
+        avatar: user.avatar || '👤', starter_pokemon: user.starter_pokemon || '',
+        trainer_id: user.trainer_id || null
       }
     });
   } catch (err) {

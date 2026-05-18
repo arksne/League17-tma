@@ -127,6 +127,7 @@ export async function initDB(retries = 3) {
     `ALTER TABLE users ADD COLUMN registered_at TEXT DEFAULT ''`,
     `ALTER TABLE leaderboard ADD COLUMN pokemon_count INTEGER DEFAULT 0`,
     `ALTER TABLE leaderboard ADD COLUMN legendary_count INTEGER DEFAULT 0`,
+    `ALTER TABLE users ADD COLUMN trainer_id INTEGER UNIQUE`,
   ];
   for (const sql of migrations) {
     try { await db.run(sql); } catch (e) {
