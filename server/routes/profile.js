@@ -79,7 +79,7 @@ router.get('/trainers', async (req, res) => {
 router.get('/trainers/all', async (req, res) => {
   try {
     const db = getDB();
-    const users = await db.all('SELECT id, username, first_name, nickname, avatar, registered, created_at, registered_at, trainer_id FROM users ORDER BY id DESC');
+    const users = await db.all('SELECT id, username, first_name, nickname, avatar, registered, created_at, registered_at FROM users ORDER BY id DESC');
     for (const u of users) {
       const save = await db.get('SELECT save_data, updated_at FROM game_saves WHERE user_id = ?', u.id);
       const loc = await db.get('SELECT location_id, updated_at FROM user_locations WHERE user_id = ?', u.id);
@@ -112,7 +112,7 @@ router.get('/:userId', async (req, res) => {
     const userId = parseInt(req.params.userId);
     if (isNaN(userId)) return res.status(400).json({ error: 'Invalid userId' });
 
-    const user = await db.get('SELECT id, username, first_name, trainer_id FROM users WHERE id = ?', userId);
+    const user = await db.get('SELECT id, username, first_name FROM users WHERE id = ?', userId);
     if (!user) return res.status(404).json({ error: 'User not found' });
 
     const save = await db.get('SELECT save_data FROM game_saves WHERE user_id = ?', userId);
@@ -120,7 +120,6 @@ router.get('/:userId', async (req, res) => {
 
     let profile = {
       id: user.id,
-      trainer_id: user.trainer_id || null,
       username: user.username,
       first_name: user.first_name,
       badges: lb?.badges_count || 0,

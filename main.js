@@ -3884,8 +3884,6 @@ export async function openTrainerProfile(userId) {
     document.getElementById('modal-trainer-name').innerHTML = onlineDot + escHtml(p.first_name || p.username || `Trainer#${p.id}`) + `<span style="font-size:0.7rem;color:${isOnline ? '#34c759' : '#888'};">${statusText}</span>`;
     document.getElementById('modal-trainer-money').innerText = `¥${p.money}`;
     document.getElementById('modal-trainer-badges').innerText = p.badges;
-    const idEl = document.getElementById('modal-trainer-id');
-    if (idEl) idEl.innerText = p.trainer_id ? `#${p.trainer_id}` : '';
 
     // Show Trade/Battle buttons if trainer is online
     const actionsDiv = document.getElementById('modal-trainer-actions');

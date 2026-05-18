@@ -34,7 +34,7 @@ export async function loadAllTrainers() {
         <div class="trainer-list-avatar">${avatarHtml}</div>
         <div class="trainer-list-info">
           <div class="trainer-list-name">${onlineDot}${escHtml(u.nickname || u.first_name || u.username || 'Тренер')} ${u.registered ? '✅' : '🆕'}</div>
-          <div class="trainer-list-id">#${u.trainer_id || '?'} | 🏅${u.badges||0} | 💰${u.money||0} | 🐾${u.teamSize||0}</div>
+          <div class="trainer-list-id">🏅${u.badges||0} | 💰${u.money||0} | 🐾${u.teamSize||0}</div>
           <div class="trainer-list-id">📍${u.region || '?'} | 🕐${lastSeen}</div>
         </div>`;
       card.addEventListener('click', () => openTrainerProfile(u.id));
@@ -76,7 +76,7 @@ export function initTrainersTab() {
 export function showAccountPanel() {
   document.getElementById('account-avatar').textContent = localStorage.getItem(lsKey('avatar')) || '👤';
   document.getElementById('account-name').textContent = getSocialState().trainerNickname || getSocialState().tgUser?.first_name || 'Тренер';
-  document.getElementById('account-id').textContent = `🏷 Тренер ID: #${getSocialState().tgUser?.trainer_id || '?'}`;
+  document.getElementById('account-id').textContent = `Telegram ID: ${getSocialState().tgUser?.id || '?'}`;
   document.getElementById('account-nickname').value = getSocialState().trainerNickname || '';
   document.getElementById('account-avatar-select').value = localStorage.getItem(lsKey('avatar')) || '👤';
 }
