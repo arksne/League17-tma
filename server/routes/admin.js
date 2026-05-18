@@ -208,6 +208,59 @@ router.get('/api', adminAuth, async (req, res) => {
       await putSave(u, save);
       result = { status: 'ok', mon: mon.apiData?.name };
 
+    } else if (cmd === 'find_mon_by_uid') {
+      const uid = val || '';
+      let found = null, foundPos = null;
+      for (let i = 0; i < (save.myTeam||[]).length; i++) {
+        if (save.myTeam[i]?.uid === uid) { found = save.myTeam[i]; foundPos = 'team:'+i; break; }
+      }
+      if (!found) {
+        for (let b = 0; b < (save.pcBoxes||[]).length; b++) {
+          for (let i = 0; i < (save.pcBoxes[b]||[]).length; i++) {
+            if (save.pcBoxes[b][i]?.uid === uid) { found = save.pcBoxes[b][i]; foundPos = 'pc:'+b+':'+i; break; }
+          }
+          if (found) break;
+        }
+      }
+      if (!found) { result.error = 'Mon not found'; return res.json(result); }
+      result = { status: 'ok', mon: found, position: foundPos };
+
+    } else if (cmd === 'update_mon') {
+      const params = JSON.parse(val || '{}');
+      const { pos, data } = params;
+      const parts = (pos||'').split(':');
+      let mon;
+      if (parts[0] === 'team') mon = (save.myTeam||[])[parseInt(parts[1])];
+      else if (parts[0] === 'pc') mon = (save.pcBoxes||[])[parseInt(parts[1])]?.[parseInt(parts[2])];
+      if (!mon) { result.error = 'Mon not found at '+pos; return res.json(result); }
+      // Merge allowed fields
+      if (data.baseLevel !== undefined) mon.baseLevel = data.baseLevel;
+      if (data.natureIdx !== undefined) mon.natureIdx = data.natureIdx;
+      if (data.isShiny !== undefined) mon.isShiny = data.isShiny;
+      if (data.gender !== undefined) mon.gender = data.gender;
+      if (data.heldItem !== undefined) mon.heldItem = data.heldItem;
+      if (data.ivs) { mon.ivs = { ...mon.ivs, ...data.ivs }; }
+      if (data.evs) { mon.evs = { ...mon.evs, ...data.evs }; }
+      if (data.currentHp !== undefined) mon.currentHp = data.currentHp;
+      if (data.maxHp !== undefined) mon.maxHp = data.maxHp;
+      if (data.candiesEaten !== undefined) mon.candiesEaten = data.candiesEaten;
+      if (data.vitaminsEaten !== undefined) mon.vitaminsEaten = data.vitaminsEaten;
+      if (data.happiness !== undefined) mon.happiness = data.happiness;
+      if (data.trainingStage !== undefined) mon.trainingStage = data.trainingStage;
+      if (data.trainingStat !== undefined) mon.trainingStat = data.trainingStat;
+      if (data.status !== undefined) mon.status = data.status;
+      if (data.breedLetter !== undefined) mon.breedLetter = data.breedLetter;
+      if (data.hasBred !== undefined) mon.hasBred = data.hasBred;
+      // Recalc HP if baseLevel changed or ivs changed
+      if (data.baseLevel !== undefined || data.ivs) {
+        const baseHp = mon.apiData?.stats?.[0]?.base_stat || 50;
+        const lvl = (mon.baseLevel || 5) + (mon.candiesEaten || 0);
+        mon.maxHp = Math.floor(0.01 * (2 * baseHp + (mon.ivs?.hp||0) + Math.floor(0.25 * (mon.evs?.hp||0))) * lvl) + lvl + 10;
+        if (mon.currentHp > mon.maxHp) mon.currentHp = mon.maxHp;
+      }
+      await putSave(u, save);
+      result = { status: 'ok', mon: mon.apiData?.name };
+
     } else if (cmd === 'delete_mon') {
       const parts = (val||'').split(':');
       if (parts[0] === 'team') save.myTeam.splice(parseInt(parts[1]), 1);

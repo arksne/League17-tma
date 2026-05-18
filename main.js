@@ -3143,7 +3143,6 @@ function updateStatusDisplay_Profile(mon) {
   }
 }
 
-// ... keeping rest identical down to end
 function updateTrainingUI_Profile(mon) {
   const stageName = trainingStages[mon.trainingStage].name;
   const pct = trainingStages[mon.trainingStage].pct;
@@ -3165,17 +3164,8 @@ function updateHappinessUI_Profile(mon) {
 
 function updateGenecodeDisplay_Profile(mon) {
   const iv = mon.ivs;
-  const ev = mon.evs;
-  const candyStr = `c${mon.candiesEaten || 0}`;
-  const vitStr = `v${(mon.vitaminsEaten || 0) * 10}`;
-  const hapStr = `h${mon.happiness || 70}`;
-  const lvlStr = `l${(mon.baseLevel || 5) + (mon.candiesEaten || 0)}`;
-  const trainStr = `t${mon.trainingStage || 0}`;
-  const breedStr = `${mon.breedLetter || 'A'}`;
   const genecodeStr =
-    `h${iv.hp}a${iv.atk}d${iv.def}s${iv.spe}sa${iv.spa}sd${iv.spd}` +
-    `eh${ev.hp}ea${ev.atk}ed${ev.def}es${ev.spe}esa${ev.spa}esd${ev.spd}` +
-    `${candyStr}${vitStr}${hapStr}${lvlStr}${trainStr}${breedStr}`;
+    `h${iv.hp}a${iv.atk}d${iv.def}s${iv.spe}sa${iv.spa}sd${iv.spd}`;
   document.getElementById('info-genecode').innerText = genecodeStr;
   // Show UID & original trainer
   const uidEl = document.getElementById('info-uid');

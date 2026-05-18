@@ -43,6 +43,24 @@ tr:hover{background:#1a1a1a}
 </style></head><body>
 <h1>PokeMatrix Admin</h1>
 
+<!-- Mon Editor Modal -->
+<div id="monEditorModal" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.8);z-index:999;overflow:auto" onclick="if(event.target===this)closeMonEditor()">
+  <div style="max-width:600px;margin:30px auto;background:#111;border:1px solid #333;border-radius:12px;padding:16px">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+      <h2 style="color:#af52de;margin:0;font-size:1rem" id="editorTitle">Редактор покемона</h2>
+      <button onclick="closeMonEditor()" style="background:none;border:none;color:#888;font-size:1.5rem;cursor:pointer">&times;</button>
+    </div>
+    <div id="editorBody" style="display:grid;grid-template-columns:1fr 1fr;gap:8px;font-size:0.75rem">
+      <!-- Fields will be populated dynamically -->
+    </div>
+    <div style="display:flex;gap:8px;margin-top:12px;justify-content:flex-end">
+      <button class="btn btn-gray" onclick="closeMonEditor()">Отмена</button>
+      <button class="btn btn-green" onclick="saveMonEditor()">Сохранить</button>
+    </div>
+    <div id="editorError" style="color:#ff3b30;font-size:0.7rem;margin-top:6px"></div>
+  </div>
+</div>
+
 <div class="row" style="align-items:center">
   <select id="userSelect" style="flex:1;max-width:300px" onchange="loadUser()">
     <option value="">— Выбери игрока —</option>
@@ -254,7 +272,10 @@ function monCard(m, idx, location, boxIdx) {
     '</div></div>';
 }
 
-async function editMonDialog(pos) {
+let _editingPos = null;
+
+function openMonEditor(pos) {
+  _editingPos = pos;
   var parts = pos.split(':');
   var loc = parts[0];
   var idx = parseInt(parts[1]);
@@ -262,17 +283,116 @@ async function editMonDialog(pos) {
   var mon;
   if (loc === 'team') mon = (currentSave.myTeam||[])[idx];
   else mon = (currentSave.pcBoxes||[])[boxIdx]?.[idx];
-  if (!mon) return;
-  var newLvl = prompt('Уровень (baseLevel):', mon.baseLevel||1);
-  if (newLvl === null) return;
-  var newSpecies = prompt('Вид (species name, пусто=не менять):', mon.apiData?.name||'');
-  if (newSpecies === null) return;
-  var shiny = confirm('Шайни? (OK=да, Отмена=нет)');
-  var result = await fetch('/admin/api?token='+TOKEN+'&cmd=edit_mon&user='+encodeURIComponent(currentUsername||currentUserId)+
-    '&val='+encodeURIComponent(JSON.stringify({pos:pos, baseLevel: parseInt(newLvl), species: newSpecies||undefined, shiny:shiny})));
-  var json = await result.json();
-  if (json.status === 'ok') loadUser();
-  else alert('Ошибка: '+json.error);
+  if (!mon) { alert('Mon not found'); return; }
+
+  document.getElementById('editorTitle').innerText = 'Редактор: ' + (mon.apiData?.name || '?') + ' (' + pos + ')';
+  var body = document.getElementById('editorBody');
+  var iv = mon.ivs || {hp:0,atk:0,def:0,spa:0,spd:0,spe:0};
+  var ev = mon.evs || {hp:0,atk:0,def:0,spa:0,spd:0,spe:0};
+  var natures = ['Hardy','Lonely','Brave','Adamant','Naughty','Bold','Docile','Relaxed','Impish','Lax','Timid','Hasty','Serious','Jolly','Naive','Modest','Mild','Quiet','Bashful','Rash','Calm','Gentle','Sassy','Careful','Quirky'];
+  var natureOpts = natures.map(function(n,i){ return '<option value="'+i+'"'+(mon.natureIdx==i?' selected':'')+'>'+n+'</option>'; }).join('');
+
+  body.innerHTML =
+    '<div class="card" style="grid-column:1/-1;margin:0"><h3>Основное</h3>'+
+      '<div class="inline"><label>UID:</label><input id="me-uid" value="'+esc(mon.uid||'')+'" readonly style="width:120px;color:#555"></div>'+
+      '<div class="inline"><label>Вид:</label><input id="me-species" value="'+esc(mon.apiData?.name||'')+'" style="width:120px" placeholder="pikachu"></div>'+
+      '<div class="inline"><label>Уровень:</label><input id="me-lvl" type="number" value="'+(mon.baseLevel||5)+'" style="width:60px"></div>'+
+      '<div class="inline"><label>Шайни:</label><select id="me-shiny"><option value="0"'+(mon.isShiny?'':' selected')+'>Нет</option><option value="1"'+(mon.isShiny?' selected':'')+'>Да</option></select>'+
+      '<label>Пол:</label><select id="me-gender"><option value="M"'+(mon.gender=='M'?' selected':'')+'>♂ M</option><option value="F"'+(mon.gender=='F'?' selected':'')+'>♀ F</option><option value="?"'+(mon.gender!='M'&&mon.gender!='F'?' selected':'')+'>?</option></select></div>'+
+      '<div class="inline"><label>Характер:</label><select id="me-nature" style="width:140px">'+natureOpts+'</select></div>'+
+      '<div class="inline"><label>HP:</label><input id="me-curhp" type="number" value="'+(mon.currentHp||0)+'" style="width:50px"> / <input id="me-maxhp" type="number" value="'+(mon.maxHp||0)+'" style="width:50px"></div>'+
+      '<div class="inline"><label>Держит:</label><input id="me-item" value="'+esc(mon.heldItem||'')+'" style="width:120px" placeholder="none"></div>'+
+    '</div>'+
+    '<div class="card" style="margin:0"><h3>IV (0-31)</h3>'+
+      '<div class="inline"><label>HP:</label><input id="me-iv-hp" type="number" min="0" max="31" value="'+iv.hp+'" style="width:50px"></div>'+
+      '<div class="inline"><label>ATK:</label><input id="me-iv-atk" type="number" min="0" max="31" value="'+iv.atk+'" style="width:50px"></div>'+
+      '<div class="inline"><label>DEF:</label><input id="me-iv-def" type="number" min="0" max="31" value="'+iv.def+'" style="width:50px"></div>'+
+      '<div class="inline"><label>SPA:</label><input id="me-iv-spa" type="number" min="0" max="31" value="'+iv.spa+'" style="width:50px"></div>'+
+      '<div class="inline"><label>SPD:</label><input id="me-iv-spd" type="number" min="0" max="31" value="'+iv.spd+'" style="width:50px"></div>'+
+      '<div class="inline"><label>SPE:</label><input id="me-iv-spe" type="number" min="0" max="31" value="'+iv.spe+'" style="width:50px"></div>'+
+    '</div>'+
+    '<div class="card" style="margin:0"><h3>EV (0-255)</h3>'+
+      '<div class="inline"><label>HP:</label><input id="me-ev-hp" type="number" min="0" max="255" value="'+ev.hp+'" style="width:60px"></div>'+
+      '<div class="inline"><label>ATK:</label><input id="me-ev-atk" type="number" min="0" max="255" value="'+ev.atk+'" style="width:60px"></div>'+
+      '<div class="inline"><label>DEF:</label><input id="me-ev-def" type="number" min="0" max="255" value="'+ev.def+'" style="width:60px"></div>'+
+      '<div class="inline"><label>SPA:</label><input id="me-ev-spa" type="number" min="0" max="255" value="'+ev.spa+'" style="width:60px"></div>'+
+      '<div class="inline"><label>SPD:</label><input id="me-ev-spd" type="number" min="0" max="255" value="'+ev.spd+'" style="width:60px"></div>'+
+      '<div class="inline"><label>SPE:</label><input id="me-ev-spe" type="number" min="0" max="255" value="'+ev.spe+'" style="width:60px"></div>'+
+    '</div>'+
+    '<div class="card" style="margin:0"><h3>Прочее</h3>'+
+      '<div class="inline"><label>Конфеты:</label><input id="me-candies" type="number" min="0" value="'+(mon.candiesEaten||0)+'" style="width:50px"></div>'+
+      '<div class="inline"><label>Витамины:</label><input id="me-vitamins" type="number" min="0" max="10" value="'+(mon.vitaminsEaten||0)+'" style="width:50px"></div>'+
+      '<div class="inline"><label>Счастье:</label><input id="me-happiness" type="number" min="0" max="255" value="'+(mon.happiness||70)+'" style="width:60px"></div>'+
+      '<div class="inline"><label>Тренир.:</label><input id="me-training" type="number" min="0" value="'+(mon.trainingStage||0)+'" style="width:50px"> <select id="me-trainingStat"><option value="">—</option><option value="atk"'+(mon.trainingStat=='atk'?' selected':'')+'>Атака</option><option value="def"'+(mon.trainingStat=='def'?' selected':'')+'>Защита</option><option value="spa"'+(mon.trainingStat=='spa'?' selected':'')+'>Сп.Атака</option><option value="spd"'+(mon.trainingStat=='spd'?' selected':'')+'>Сп.Защита</option><option value="spe"'+(mon.trainingStat=='spe'?' selected':'')+'>Скорость</option></select></div>'+
+      '<div class="inline"><label>Статус:</label><input id="me-status" value="'+esc(mon.status||'')+'" style="width:100px" placeholder="par, slp, psn, brn, frz"></div>'+
+      '<div class="inline"><label>Буква рода:</label><input id="me-breedLetter" value="'+esc(mon.breedLetter||'A')+'" style="width:40px" maxlength="1"></div>'+
+      '<div class="inline"><label>Стерилен:</label><select id="me-hasBred"><option value="0"'+(mon.hasBred?'':' selected')+'>Нет</option><option value="1"'+(mon.hasBred?' selected':'')+'>Да</option></select></div>'+
+    '</div>';
+  document.getElementById('monEditorModal').style.display = 'block';
+}
+
+function closeMonEditor() {
+  document.getElementById('monEditorModal').style.display = 'none';
+  _editingPos = null;
+}
+
+async function saveMonEditor() {
+  if (!_editingPos) return;
+  var data = {
+    baseLevel: parseInt(document.getElementById('me-lvl').value),
+    natureIdx: parseInt(document.getElementById('me-nature').value),
+    isShiny: document.getElementById('me-shiny').value === '1',
+    gender: document.getElementById('me-gender').value,
+    heldItem: document.getElementById('me-item').value || null,
+    currentHp: parseInt(document.getElementById('me-curhp').value),
+    maxHp: parseInt(document.getElementById('me-maxhp').value),
+    candiesEaten: parseInt(document.getElementById('me-candies').value) || 0,
+    vitaminsEaten: parseInt(document.getElementById('me-vitamins').value) || 0,
+    happiness: parseInt(document.getElementById('me-happiness').value) || 70,
+    trainingStage: parseInt(document.getElementById('me-training').value) || 0,
+    trainingStat: document.getElementById('me-trainingStat').value || null,
+    status: document.getElementById('me-status').value || null,
+    breedLetter: document.getElementById('me-breedLetter').value || 'A',
+    hasBred: document.getElementById('me-hasBred').value === '1',
+    ivs: {
+      hp: Math.min(31, Math.max(0, parseInt(document.getElementById('me-iv-hp').value)||0)),
+      atk: Math.min(31, Math.max(0, parseInt(document.getElementById('me-iv-atk').value)||0)),
+      def: Math.min(31, Math.max(0, parseInt(document.getElementById('me-iv-def').value)||0)),
+      spa: Math.min(31, Math.max(0, parseInt(document.getElementById('me-iv-spa').value)||0)),
+      spd: Math.min(31, Math.max(0, parseInt(document.getElementById('me-iv-spd').value)||0)),
+      spe: Math.min(31, Math.max(0, parseInt(document.getElementById('me-iv-spe').value)||0))
+    },
+    evs: {
+      hp: Math.min(255, Math.max(0, parseInt(document.getElementById('me-ev-hp').value)||0)),
+      atk: Math.min(255, Math.max(0, parseInt(document.getElementById('me-ev-atk').value)||0)),
+      def: Math.min(255, Math.max(0, parseInt(document.getElementById('me-ev-def').value)||0)),
+      spa: Math.min(255, Math.max(0, parseInt(document.getElementById('me-ev-spa').value)||0)),
+      spd: Math.min(255, Math.max(0, parseInt(document.getElementById('me-ev-spd').value)||0)),
+      spe: Math.min(255, Math.max(0, parseInt(document.getElementById('me-ev-spe').value)||0))
+    }
+  };
+  var species = document.getElementById('me-species').value.trim();
+  var val = JSON.stringify({pos: _editingPos, data: data});
+
+  document.getElementById('editorError').innerText = 'Сохранение...';
+  var result = await api('update_mon', null, val);
+  if (result.status === 'ok') {
+    // Also handle species change
+    if (species && species !== currentSave.myTeam?.[0]?.apiData?.name) {
+      await api('edit_mon', null, JSON.stringify({pos: _editingPos, species: species}));
+    }
+    document.getElementById('editorError').style.color = '#34c759';
+    document.getElementById('editorError').innerText = 'Сохранено!';
+    closeMonEditor();
+    loadUser();
+  } else {
+    document.getElementById('editorError').style.color = '#ff3b30';
+    document.getElementById('editorError').innerText = 'Ошибка: ' + (result.error || 'unknown');
+  }
+}
+
+async function editMonDialog(pos) {
+  openMonEditor(pos);
 }
 
 async function healMon(pos) { await api('edit_mon', null, JSON.stringify({pos:pos, heal:true})); loadUser(); }
