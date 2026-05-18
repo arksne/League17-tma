@@ -169,7 +169,7 @@ async function claudeAutoReply(userText, io, db, username) {
             evs: {hp:0,atk:0,def:0,spa:0,spd:0,spe:0},
             baseLevel: 70, exp: 343000, expToNext: 357911,
             candiesEaten:0, vitaminsEaten:0, training:null, trainingStage:0, trainingStat:null,
-            happiness:70, natureIdx:0, breedLetter:'S', status:null, sleepTurns:0,
+            happiness:70, natureIdx:Math.floor(Math.random()*25), breedLetter:'S', status:null, sleepTurns:0,
             movesPP:[], statStages:{atk:0,def:0,spa:0,spd:0,spe:0},
             abilityName: pokeData.abilities[0]?.ability?.name||null,
             heldItem:null, berries:{sitrusBerry:0,oranBerry:0,lumBerry:0,chestoBerry:0,rawstBerry:0},

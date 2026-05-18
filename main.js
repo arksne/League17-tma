@@ -1459,7 +1459,7 @@ function collectEgg(eggUid) {
     baseLevel: 0, exp: 0, expToNext: 0,
     candiesEaten: 0, vitaminsEaten: 0,
     training: null, trainingStage: 0, trainingStat: null,
-    happiness: 0, natureIdx: 0, breedLetter: 'A',
+    happiness: 0, natureIdx: Math.floor(Math.random() * natures.length), breedLetter: 'A',
     gender: null, status: null, sleepTurns: 0,
     movesPP: [], statStages: { atk: 0, def: 0, spa: 0, spd: 0, spe: 0 },
     abilityName: null, heldItem: null,
@@ -2060,12 +2060,12 @@ async function giveStarterMon(pokemonName) {
     const res = await fetch(`https://pokeapi.co/api/v2/pokemon/${pokemonName}`);
     const starterData = await res.json();
     const baseLevel = 5;
-    
+
     // Filter moves to only those learned at level <= 5
     let learnedMoves = starterData.moves.filter(m => {
       return m.version_group_details.some(v => v.move_learn_method.name === 'level-up' && v.level_learned_at <= baseLevel);
     }).slice(0, 4);
-    
+
     if (learnedMoves.length === 0) {
       learnedMoves.push({ move: { name: 'tackle', url: 'https://pokeapi.co/api/v2/move/33/' } });
     }
@@ -2093,7 +2093,7 @@ async function giveStarterMon(pokemonName) {
       trainingStage: 0,
       trainingStat: null,
       happiness: 70,
-      natureIdx: 0,
+      natureIdx: Math.floor(Math.random() * natures.length),
       breedLetter: 'A',
       gender: Math.random() < 0.5 ? 'male' : 'female',
       status: null,
