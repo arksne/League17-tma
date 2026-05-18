@@ -43,7 +43,14 @@ export function verifyTelegramInitData(initData, botToken) {
   }
 }
 
-export function parseTestUser() {
+export function parseTestUser(raw) {
+  // Support custom test users via `test_{"id":N,"username":"s","first_name":"s"}`
+  if (raw && raw.startsWith('{')) {
+    try {
+      const custom = JSON.parse(raw);
+      if (custom && custom.id) return custom;
+    } catch (_) {}
+  }
   return {
     id: 123456789,
     first_name: 'Test',

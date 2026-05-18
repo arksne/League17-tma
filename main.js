@@ -3476,7 +3476,13 @@ async function authTelegram() {
   }
 
   try {
-    const initData = (isLocalhost || devMode) ? 'test' : window.Telegram.WebApp.initData;
+    // In dev mode, use injected Telegram data (for multi-trainer testing) or fall back to 'test'
+    let initData;
+    if (isLocalhost || devMode) {
+      initData = window.Telegram?.WebApp?.initData || 'test';
+    } else {
+      initData = window.Telegram.WebApp.initData;
+    }
     const res = await fetch(`${API_BASE}/auth/tg`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
