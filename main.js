@@ -2188,10 +2188,8 @@ async function giveStarterMon(pokemonName) {
       learnableMoves: []
     };
 
-    const baseHp = starterData.stats[0].base_stat;
-    const maxHp = Math.floor(0.01 * (2 * baseHp + newMon.ivs.hp + Math.floor(0.25 * newMon.evs.hp)) * newMon.baseLevel) + newMon.baseLevel + 10;
-    newMon.currentHp = maxHp;
-    newMon.maxHp = maxHp;
+    newMon.maxHp = Math.floor(0.01 * (2 * starterData.stats[0].base_stat + newMon.ivs.hp + Math.floor(0.25 * newMon.evs.hp)) * newMon.baseLevel) + newMon.baseLevel + 10;
+            newMon.currentHp = newMon.maxHp;
 
     if (myTeam.length < 6) {
       myTeam.push(newMon);
