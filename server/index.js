@@ -35,10 +35,13 @@ app.use((req, res, next) => {
   next();
 });
 
-// Global rate limit: 100 req/min per IP
+// Serve static files FIRST — before rate limiter to avoid 429 on assets
+app.use(express.static(path.join(__dirname, '../dist'), { maxAge: '1d', immutable: true }));
+
+// Global rate limit: 500 req/min per IP
 app.use(rateLimit({
   windowMs: 60 * 1000,
-  max: 100,
+  max: 500,
   standardHeaders: true,
   legacyHeaders: false,
 }));

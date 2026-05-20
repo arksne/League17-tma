@@ -23,6 +23,16 @@ export function initInventoryEvents() {
       btn.addEventListener('click', () => useItem(itemId));
     }
   }
+
+  // Held item button opens item picker
+  const heldBtn = document.getElementById('qa-held-item');
+  if (heldBtn) {
+    heldBtn.addEventListener('click', () => {
+      const idx = getTeamState().currentPokemonIndex;
+      if (idx !== null) openHeldItemPicker(idx);
+      else showToast('Сначала выберите покемона во вкладке "Команда"!', true);
+    });
+  }
 }
 
 export function updateDynamicEVs() {
@@ -169,6 +179,18 @@ export function updateQADisplays() {
   for (const [elId, itemId] of Object.entries(map)) {
     const el = document.getElementById(elId);
     if (el) el.textContent = getItemQty(itemId);
+  }
+
+  // Held item display shows current held item name
+  const heldQty = document.getElementById('qa-qty-held-item');
+  if (heldQty) {
+    const idx = getTeamState().currentPokemonIndex;
+    if (idx !== null) {
+      const mon = getTeamState().myTeam[idx];
+      heldQty.textContent = mon?.heldItem ? getHeldItemName(mon.heldItem) : 'Пусто';
+    } else {
+      heldQty.textContent = '-';
+    }
   }
 }
 

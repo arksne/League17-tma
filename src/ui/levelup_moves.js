@@ -1,4 +1,4 @@
-import { appendToLog, showSelectionModal } from '../../main.js';
+import { appendToLog } from '../../main.js';
 
 // FEATURE: LEVEL-UP MOVE LEARNING
 // ================================================================
@@ -49,11 +49,11 @@ export function offerLearnMove(pokemon, move) {
   return new Promise((resolve) => {
     const moveName = move.name;
     const monName = pokemon.nickname || pokemon.apiData.name;
+    const url = move.url || `https://pokeapi.co/api/v2/move/${moveName}/`;
 
-    // Find empty slot or show picker
+    // Find empty slot
     const emptySlot = (pokemon.apiData.moves || []).findIndex(m => !m);
     if (emptySlot >= 0) {
-      const url = move.url || `https://pokeapi.co/api/v2/move/${moveName}/`;
       if (!pokemon.apiData.moves[emptySlot]) {
         pokemon.apiData.moves[emptySlot] = { move: { name: moveName, url } };
       }
@@ -62,13 +62,12 @@ export function offerLearnMove(pokemon, move) {
       return;
     }
 
-    // All slots full — auto-save to reserve
-    const url = move.url || `https://pokeapi.co/api/v2/move/${moveName}/`;
+    // All 4 slots full — send to reserve automatically
     if (!pokemon.learnableMoves) pokemon.learnableMoves = [];
     if (!pokemon.learnableMoves.some(m => m.name === moveName)) {
       pokemon.learnableMoves.push({ name: moveName, url, power: move.power || 0, type: move.type?.name || 'normal' });
     }
-    appendToLog(`${monName} выучил ${moveName} (резерв)!`, false, 'system');
+    appendToLog(`${monName}: ${moveName} упал в резерв (все слоты заняты).`, false, 'system');
     resolve(false);
   });
 }

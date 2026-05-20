@@ -791,6 +791,11 @@ function getWildLevel() {
   const loc = getLocation(GS.currentLocationId);
   const name = (loc?.name || '').toLowerCase();
   const id = GS.currentLocationId || '';
+  // Johto routes: 5-15 for early, scaling up
+  if (id.startsWith('ej_route_') || id.startsWith('east_johto') || id.includes('flourence') || id.includes('alston')) return Math.floor(Math.random() * 11) + 5;
+  if (id.includes('goldenrod') && !id.includes('stadium')) return Math.floor(Math.random() * 6) + 5;
+  if (id.includes('warhall') || id.includes('ostaron')) return Math.floor(Math.random() * 11) + 20;
+  if (id.includes('olivine') || id.includes('sayref') || id.includes('ilde')) return Math.floor(Math.random() * 11) + 30;
   // Victory Road / Indigo Plateau: 40-50
   if (id.includes('victory') || id.includes('indigo')) return Math.floor(Math.random() * 11) + 40;
   // Late-game Kanto routes: 30-40
@@ -1436,8 +1441,8 @@ async function useMove(moveIndex) {
       const dropText = dropResults.map(d => `${d.qty}x ${itemDef(d.item).nameRu}`).join(', ');
       appendToLog(`Добыча: ${dropText}`, false, 'quest');
     }
-    modifyMoney(wildLvl * 15);
-    checkQuestProgress('earn_money', wildLvl * 15);
+    modifyMoney(wildLvl * 20 + 50);
+    checkQuestProgress('earn_money', wildLvl * 20 + 50);
 
     const baseExp = activeWild.base_experience || 50;
     let expGain = Math.floor((baseExp * wildLvl) / 7);
@@ -1565,8 +1570,8 @@ function enemyTurn() {
       const dropText = dropResults.map(d => `${d.qty}x ${itemDef(d.item).nameRu}`).join(', ');
       appendToLog(`Добыча: ${dropText}`, false, 'quest');
     }
-    modifyMoney(wildLvl * 15);
-    checkQuestProgress('earn_money', wildLvl * 15);
+    modifyMoney(wildLvl * 20 + 50);
+    checkQuestProgress('earn_money', wildLvl * 20 + 50);
     document.getElementById('battle-main-menu').style.display = 'none';
     document.getElementById('battle-end-menu').style.display = 'flex';
     clearBattleState();
@@ -1628,13 +1633,11 @@ function enemyTurn() {
   if (activeWild.heldItem === 'expertBelt' && wildEffTypeMult > 1) wildHeldMult = 1.2;
   if (activeWild.heldItem === 'lifeOrb') wildHeldMult = 1.3;
 
-  let baseDmg = Math.floor((((2 * wildLvl / 5 + 2) * power * (A / D)) / 50) + 2);
-  let dmg = Math.floor(baseDmg * (0.85 + Math.random() * 0.15));
-
+  const baseDmg = Math.floor((((2 * wildLvl / 5 + 2) * power * (A / D)) / 50) + 2);
   const isCrit = Math.random() < 0.0625;
   const critMult = isCrit ? 1.5 : 1.0;
-
-  dmg = Math.floor(dmg * wildStab * wildEffTypeMult * weatherMult * critMult * wildHeldMult);
+  const randMod = 0.85 + Math.random() * 0.15;
+  let dmg = Math.floor(baseDmg * wildStab * wildEffTypeMult * weatherMult * randMod * critMult * wildHeldMult);
 
   if (isCrit) appendToLog('Критический удар!', false, 'dmg');
   if (wildEffTypeMult > 1) {
@@ -2362,7 +2365,13 @@ async function useMoveGym(moveIndex) {
 
   const power = move.power;
   if (!power) {
+    // Assault Vest: can't use status moves
+    if (activePlayerMon.heldItem === 'assaultVest') {
+      appendToLog('Штурмовой жилет не позволяет использовать статус-атаки!');
+      return;
+    }
     const ailment = move.meta?.ailment?.name;
+    let appliedAilment = false;
     if (ailment && ailment !== 'none' && ailment !== 'unknown') {
       const statusMap = { 'poison': 'psn', 'badly-poison': 'psn', 'burn': 'brn', 'paralysis': 'par', 'sleep': 'slp', 'freeze': 'frz' };
       const targetStatus = statusMap[ailment];
@@ -2371,22 +2380,35 @@ async function useMoveGym(moveIndex) {
           wildStatus = activeWild.status;
           document.getElementById('wild-status-icon').innerText = getStatusIcon(wildStatus);
           appendToLog(`${activeWild.name} получил ${STATUS_NAMES[targetStatus]}!`);
+          appliedAilment = true;
         }
       }
     }
     // Stat changes for non-damaging moves in gym battles
+    let appliedStat = false;
     const statChanges = move.stat_changes || [];
-    for (const sc of statChanges) {
-      const change = sc.change;
-      const statName = sc.stat.name;
-      const statMap = { 'attack': 'atk', 'defense': 'def', 'special-attack': 'spa', 'special-defense': 'spd', 'speed': 'spe' };
-      const short = statMap[statName];
-      if (short) {
-        if (change > 0) statStageModify(activePlayerMon, short, change);
-        else statStageModify(activeWild, short, change);
+    if (statChanges.length > 0) {
+      const targetMap = { 'user': activePlayerMon, 'selected-pokemon': activeWild, 'all-opponents': activeWild };
+      const moveTarget = move.target?.name || 'selected-pokemon';
+      const affectedMon = targetMap[moveTarget] || activeWild;
+      const monName = affectedMon === activePlayerMon ? activePlayerMon.apiData.name : activeWild.name;
+      const statNameMap = { 'attack': 'atk', 'defense': 'def', 'special-attack': 'spa', 'special-defense': 'spd', 'speed': 'spe' };
+      for (const sc of statChanges) {
+        const statKey = statNameMap[sc.stat.name];
+        if (statKey) {
+          statStageModify(affectedMon, statKey, sc.change);
+          const newStage = affectedMon.statStages[statKey];
+          const sign = newStage >= 0 ? '+' : '';
+          const dir = sc.change > 0 ? 'повышена' : 'понижена';
+          const labels = { atk: 'Атака', def: 'Защита', spa: 'Сп. Атака', spd: 'Сп. Защита', spe: 'Скорость' };
+          appendToLog(`${labels[statKey] || statKey} ${monName} ${dir} (${sign}${newStage})`, false, 'system');
+          appliedStat = true;
+        }
       }
     }
-    appendToLog('Но ничего не произошло...');
+    if (!appliedAilment && !appliedStat) {
+      appendToLog('Но ничего не произошло...');
+    }
   } else {
     const isPhysical = move.damage_class.name === 'physical';
     const attackStat = isPhysical ? 'attack' : 'special-attack';
@@ -2410,10 +2432,55 @@ async function useMoveGym(moveIndex) {
     const typeMult = getTypeMultiplier(move.type.name, activeWild.types);
     const weatherMult = getWeatherMultiplier(move.type.name, currentWeather);
     const randMod = 0.85 + Math.random() * 0.15;
-    let dmg = Math.floor(baseDmg * stab * typeMult * weatherMult * randMod);
+
+    // Crit rate (base 6.25%, leek +2 stages = 50%)
+    let critRate = 0.0625;
+    if (activePlayerMon.heldItem === 'leek') {
+      const species = activePlayerMon.apiData?.species?.name || '';
+      if (species === 'farfetchd' || species === 'sirfetchd') critRate = 0.5;
+    }
+    const isCrit = Math.random() < critRate;
+    const critMult = isCrit ? 1.5 : 1.0;
+
+    // Air Balloon: ground immunity for wild
+    let effTypeMult = typeMult;
+    if (activeWild.heldItem === 'airBalloon' && move.type.name === 'ground') effTypeMult = 0;
+
+    let heldMult = 1.0;
+    if (activePlayerMon.heldItem === 'expertBelt' && effTypeMult > 1) heldMult = 1.2;
+    if (activePlayerMon.heldItem === 'lifeOrb') heldMult = 1.3;
+
+    let dmg = Math.floor(baseDmg * stab * effTypeMult * weatherMult * randMod * critMult * heldMult);
+
+    if (isCrit) appendToLog('Критический удар!', false, 'dmg');
+
+    // Focus Sash: survive at 1 HP (consumed on use)
+    if (activeWild.heldItem === 'focusSash' && wildCurHP === wildMaxHP && dmg >= wildCurHP) {
+      dmg = wildCurHP - 1;
+      appendToLog(`${activeWild.name} держится благодаря Фокусному поясу!`);
+      activeWild.heldItem = null;
+    }
 
     wildCurHP -= dmg;
     if (wildCurHP < 0) wildCurHP = 0;
+
+    // Big Root: x1.3 drain healing
+    if (activePlayerMon.heldItem === 'bigRoot' && move.meta?.drain > 0) {
+      const drainPct = move.meta.drain / 100;
+      const heal = Math.floor(dmg * drainPct * 1.3);
+      if (heal > 0) {
+        activePlayerMon.currentHp = Math.min(activePlayerMon.maxHp, activePlayerMon.currentHp + heal);
+        updatePlayerHpUI();
+      }
+    }
+
+    // Life Orb recoil: -10% max HP
+    if (activePlayerMon.heldItem === 'lifeOrb' && power) {
+      const recoil = Math.max(1, Math.floor(activePlayerMon.maxHp / 10));
+      activePlayerMon.currentHp -= recoil;
+      if (activePlayerMon.currentHp < 0) activePlayerMon.currentHp = 0;
+      updatePlayerHpUI();
+    }
 
     // Sturdy check
     const wildAbil = activeWild.abilities?.[0]?.ability?.name;
@@ -2616,8 +2683,7 @@ function enemyTurnGym() {
   const A = calculateStat(activeWild, attackStat, true);
   const D = calculateStat(activePlayerMon, defenseStat, false);
 
-  let baseDmg = Math.floor((((2 * wildLvl / 5 + 2) * power * (A / D)) / 50) + 2);
-  let dmg = Math.floor(baseDmg * (0.85 + Math.random() * 0.15));
+  const baseDmg = Math.floor((((2 * wildLvl / 5 + 2) * power * (A / D)) / 50) + 2);
 
   const isCrit = Math.random() < 0.0625;
   const critMult = isCrit ? 1.5 : 1.0;
@@ -2628,7 +2694,8 @@ function enemyTurnGym() {
   });
   const wildTypeMult = getTypeMultiplier(chosenMove.type.name, activePlayerMon.apiData.types);
   const weatherMult = getWeatherMultiplier(chosenMove.type.name, currentWeather);
-  dmg = Math.floor(dmg * wildStab * wildTypeMult * weatherMult * critMult);
+  const randMod = 0.85 + Math.random() * 0.15;
+  let dmg = Math.floor(baseDmg * wildStab * wildTypeMult * weatherMult * randMod * critMult);
 
   if (isCrit) appendToLog('Критический удар!', false, 'dmg');
   if (wildTypeMult > 1) {

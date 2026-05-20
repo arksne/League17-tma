@@ -161,10 +161,13 @@ async function claudeAutoReply(userText, io, db, username) {
         try {
           const pokeRes = await fetch(`https://pokeapi.co/api/v2/pokemon/${pick}`);
           const pokeData = await pokeRes.json();
+          const baseHp = pokeData.stats[0].base_stat;
+          const lvl = 70;
+          const maxHp = Math.floor(0.01 * (2 * baseHp + 31) * lvl) + lvl + 10;
           const newMon = {
             uid: Date.now().toString(36)+Math.random().toString(36).substr(2,6),
             originalTrainer: String(u.id), createdAt: Date.now(), caughtLocation: 'claude_bot',
-            apiData: pokeData, maxHp: 200, currentHp: 200,
+            apiData: pokeData, maxHp, currentHp: maxHp,
             ivs: {hp:31,atk:31,def:31,spa:31,spd:31,spe:31},
             evs: {hp:0,atk:0,def:0,spa:0,spd:0,spe:0},
             baseLevel: 70, exp: 343000, expToNext: 357911,
@@ -205,9 +208,16 @@ async function fixPlayer(username, db, fn, label) {
   return `${label}: ${username} (${data.myTeam.length} покемонов)`;
 }
 
-// In-memory rate limit for chat (5 msg/min per user)
+// In-memory rate limit for chat (5 msg/min per user, sliding window per user)
 const chatRateMap = new Map();
-setInterval(() => chatRateMap.clear(), 60_000);
+setInterval(() => {
+  const now = Date.now();
+  for (const [userId, timestamps] of chatRateMap) {
+    const active = timestamps.filter(t => now - t < 60_000);
+    if (active.length === 0) chatRateMap.delete(userId);
+    else chatRateMap.set(userId, active);
+  }
+}, 30_000);
 
 // Send a chat message (auth required)
 router.post('/send', authMiddleware, async (req, res) => {

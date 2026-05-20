@@ -5,36 +5,6 @@ import {
 
 // FEATURE: TM MOVE RELEARNER
 // ================================================================
-export async function fetchLearnableMoves(mon) {
-  try {
-    const res = await fetch(`https://pokeapi.co/api/v2/pokemon/${mon.apiData.id}`);
-    const data = await res.json();
-    const allMoves = (data.moves || []).slice(0, 100);
-    const knownNames = new Set((mon.apiData.moves || []).filter(m => m).map(m => m.move.name));
-    const existingNames = new Set((mon.learnableMoves || []).map(m => m.name));
-    if (!mon.learnableMoves) mon.learnableMoves = [];
-
-    for (const entry of allMoves) {
-      const name = entry.move.name;
-      if (knownNames.has(name) || existingNames.has(name)) continue;
-      try {
-        const moveRes = await fetch(entry.move.url);
-        const moveData = await moveRes.json();
-        if (moveData.power && moveData.power > 0) {
-          mon.learnableMoves.push({
-            name: moveData.name,
-            url: entry.move.url,
-            power: moveData.power,
-            type: moveData.type?.name || 'normal'
-          });
-        }
-      } catch (e) { /* skip failed moves */ }
-      if (mon.learnableMoves.length >= 50) break;
-    }
-    refreshProfileUI();
-    autoSave();
-  } catch (e) { console.warn('fetchLearnableMoves failed', e); }
-}
 
 export async function openMoveRelearner() {
   if (getTeamState().currentPokemonIndex === null) return showToast('Сначала выберите покемона во вкладке "Команда"!', true);

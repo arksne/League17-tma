@@ -480,3 +480,57 @@ var e=Object.defineProperty,t=(t,n)=>{let r={};for(var i in t)e(r,i,{get:t[i],en
       <div class="name">${t.nameRu}</div>
       <div class="lvl">x${Math.min(r,99)}</div>
     `,i.addEventListener(`click`,()=>{n.has(t.id)?Eo=Eo.filter(e=>!(e.type===`item`&&e.data.id===t.id)):Eo.push({type:`item`,data:{id:t.id,name:t.nameRu,qty:1}}),Z.emit(`trade_offer`,{tradeId:To,offers:Eo}),Xo(),Yo(),Jo()}),e.appendChild(i)})}function Xo(){let e=document.getElementById(`trade-my-offer`),t=document.getElementById(`trade-partner-offer`);if(!e||!t)return;let n=e=>!Array.isArray(e)||e.length===0?`<span style="color:var(--tma-text-muted);">Не выбрано</span>`:e.map(e=>{if(e.type===`pokemon`){let t=e.data;return`<div class="trade-offer-entry"><img class="trade-offer-sprite" src="${t.sprite||t.apiData?.sprites?.front_default||``}" alt="${Wr(t.apiData?.name||`?`)}"><div class="trade-offer-name">${Wr(t.nickname||t.apiData?.name||`???`)}</div><div class="trade-offer-level">Lv${t.baseLevel+(t.candiesEaten||0)}</div></div>`}if(e.type===`item`){let t=e.data;return`<div class="trade-offer-entry"><div>${Ma(t.id,32)}</div><div class="trade-offer-name">${t.name}</div><div class="trade-offer-level">x${t.qty||1}</div></div>`}return``}).join(``);e.innerHTML=n(Eo),e.className=Eo.length>0?`trade-offer-slot filled`:`trade-offer-slot`,t.innerHTML=n(Do),t.className=Do.length>0?`trade-offer-slot filled`:`trade-offer-slot`}function Zo(e){let t=document.getElementById(`trade-my-status`),n=document.getElementById(`trade-partner-status`);if(!t||!n)return;let r,i;if(Oo?(r=e.p1,i=e.p2):(r=e.p2,i=e.p1),t.textContent=r?`✅ Готов`:`⏳ Ожидание`,t.className=r?`trade-status ready`:`trade-status waiting`,n.textContent=i?`✅ Готов`:`⏳ Ожидание`,n.className=i?`trade-status ready`:`trade-status waiting`,r){let e=document.getElementById(`btn-trade-confirm`);e.textContent=`✓ Ожидание партнёра...`,e.disabled=!0,e.style.opacity=`0.5`}}function Qo(){let e=document.getElementById(`trade-window-modal`);e&&(e.style.display=`none`),To=null,Eo=[],Do=[]}function $o(){return{pokedexSeen:Jr,pokedexCaught:Yr,POKEDEX_ALL:En,pokedexData:Dn,pokedexTotal:On}}function es(){return{money:B,inventory:I}}function ts(e){B+=e}function $(){return{myTeam:H,currentPokemonIndex:W}}function ns(){return{onlinePlayersList:wo,trainerNickname:li,tgUser:K}}function rs(e){li=e}function is(){return{get myTeam(){return H},get pokedexSeen(){return Jr},get pokedexCaught(){return Yr},get currentLocationId(){return P},get isDaytime(){return Xr},get gymLeaders(){return kt},get eliteFour(){return hi},get champion(){return gi},get gymBadges(){return mi},get expShareActive(){return $r},get quests(){return Mi},get questProgress(){return Ni},get completedQuests(){return Pi},get visitedLocations(){return Li},get inventory(){return I},get money(){return B},get QUEST_CONFIGS(){return ji},get itemsUsedInBattle(){return Zr},set itemsUsedInBattle(e){Zr=e}}}function as(){return{money:B,eggs:Si,ITEMS:v,trainingStages:Nt,expShareActive:$r}}function os(){$r=!$r}
+window.__devSetGameState = function(data) {
+  if (data.myTeam) { H.length = 0; data.myTeam.forEach(function(p) { H.push(p); }); }
+  if (data.inventory) { Object.keys(I).forEach(function(k) { delete I[k]; }); Object.assign(I, data.inventory); }
+  if (data.money !== undefined) B = data.money;
+  if (data.badges) { mi.length = 0; data.badges.forEach(function(b) { mi.push(b); }); }
+  if (data.pcBoxes) { U.length = 0; data.pcBoxes.forEach(function(box) { U.push(box); }); }
+  if (data.currentLocationId !== undefined) P = data.currentLocationId;
+  if (data.currentRegion) F = data.currentRegion;
+  if (data.pokedexSeen) { Jr.clear(); data.pokedexSeen.forEach(function(s) { Jr.add(s); }); }
+  if (data.pokedexCaught) { Yr.clear(); data.pokedexCaught.forEach(function(c) { Yr.add(c); }); }
+  if (data.eggs) { Si.length = 0; data.eggs.forEach(function(e) { Si.push(e); }); }
+  if (data.quests) { Mi.length = 0; data.quests.forEach(function(q) { Mi.push(q); }); }
+  if (data.questProgress) { Object.keys(Ni).forEach(function(k) { delete Ni[k]; }); Object.assign(Ni, data.questProgress); }
+  if (data.completedQuests) { Pi.length = 0; data.completedQuests.forEach(function(q) { Pi.push(q); }); }
+  if (data.visitedLocations) { Li.length = 0; data.visitedLocations.forEach(function(l) { Li.push(l); }); }
+  if (data.trainerNickname) li = data.trainerNickname;
+  if (data.tgUser) K = data.tgUser;
+  I.credit = B;
+  Sa(); Y(); zr(); Rr(); Na(); Pa();
+};
+
+window.__openPokemonProfile = function(index) {
+  if (index >= 0 && index < H.length) { Ra(index); }
+};
+window.__closePokemonProfile = function() {
+  document.getElementById('pokedex-display').style.display = 'none';
+  document.getElementById('team-roster').style.display = 'block';
+  Y();
+};
+window.__switchNav = function(target) {
+  var item = document.querySelector('.nav-item[data-target="' + target + '"]');
+  if (item) item.click();
+};
+window.__getGameState = function() {
+  return {
+    myTeam: H.map(function(p) { return Object.assign({}, p); }),
+    inventory: Object.assign({}, I),
+    money: B,
+    badges: mi.slice(),
+    pcBoxes: U.map(function(box) { return box.map(function(p) { return Object.assign({}, p); }); }),
+    currentLocationId: P,
+    currentRegion: F,
+    pokedexSeen: Array.from(Jr),
+    pokedexCaught: Array.from(Yr),
+    eggs: Si.map(function(e) { return Object.assign({}, e); }),
+    quests: Mi.map(function(q) { return Object.assign({}, q); }),
+    questProgress: Object.assign({}, Ni),
+    completedQuests: Pi.slice(),
+    visitedLocations: Li.slice(),
+    trainerNickname: li
+  };
+};
+window.__openPC = aa;
+window.__triggerEncounter = Un;

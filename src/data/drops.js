@@ -80,4 +80,15 @@ export const MONSTER_DROP_TABLE = {
   'yanma': [{ item: 'waterStone', chance: 0.45, qty: 1 }],
   'zapdos': [{ item: 'goldNugget', chance: 0.50, qty: 1 }, { item: 'metalPlate', chance: 0.80, qty: 2 }],
   'zubat': [{ item: 'goldNugget', chance: 0.03, qty: 1 }],
+  // ── Species added from wiki data (https://wiki.league17.ru) ──
+  'tentacool': [{ item: 'sparkles', chance: 0.45, qty: 1 }],
+  'murkrow': [{ item: 'leftovers', chance: 0.45, qty: 1 }],
+  'jigglypuff': [{ item: 'train', chance: 0.45, qty: 1 }],
+  'luvdisc': [{ item: 'amurit', chance: 0.45, qty: 1 }],
+  'voltorb': [{ item: 'magnifier', chance: 0.45, qty: 1 }],
+  'pinsir': [{ item: 'band', chance: 0.45, qty: 1 }],
+  'tangela': [{ item: 'greenScarf', chance: 0.45, qty: 1 }],
+  'trubbish': [{ item: 'blackSludge', chance: 0.45, qty: 1 }],
+  'garbodor': [{ item: 'blackSludge', chance: 0.45, qty: 1 }],
+  'probopass': [{ item: 'magnifier', chance: 0.45, qty: 1 }],
 };

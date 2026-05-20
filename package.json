@@ -11,7 +11,12 @@
     "build": "vite build",
     "preview": "vite preview",
     "start": "node server/index.js",
-    "server": "node server/index.js"
+    "server": "node server/index.js",
+    "test:data": "node tests/data-validation.mjs",
+    "test:api": "node tests/server-api-test.cjs",
+    "test:save": "node tests/save-validation-test.cjs",
+    "test:browser": "node tests/game-logic-test.cjs && node tests/move-system-test.cjs && node tests/stress-test.cjs",
+    "test": "bash tests/run-all.sh"
   },
   "devDependencies": {
     "vite": "^8.0.12"

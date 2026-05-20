@@ -19,8 +19,8 @@ import { checkEvolution, triggerEvolution, getEvolutions, fetchEvolutionChain } 
 export { checkEvolution, triggerEvolution, getEvolutions, fetchEvolutionChain };
 import { checkNewMovesOnLevelUp, offerLearnMove } from './src/ui/levelup_moves.js';
 export { checkNewMovesOnLevelUp, offerLearnMove };
-import { fetchLearnableMoves, openMoveRelearner, showSlotPicker } from './src/ui/tm.js';
-export { fetchLearnableMoves, openMoveRelearner, showSlotPicker };
+import { openMoveRelearner, showSlotPicker } from './src/ui/tm.js';
+export { openMoveRelearner, showSlotPicker };
 import { editNickname } from './src/ui/nickname.js';
 export { editNickname };
 import { loadChatMessages, startChatPolling, initChatSocket, stopChatPolling, sendChatMessage } from './src/ui/chat.js';
@@ -236,6 +236,34 @@ window.goto = function(locId) {
   renderLocation(locId); autoSave(); console.log('Телепорт: ' + locId);
 };
 
+// Dev/test helper: inject game state from a save data object (requires module-scoped variable access)
+window.__devSetGameState = function(data) {
+  if (!data) return;
+  if (data.inventory) inventory = { ...data.inventory };
+  if (data.money !== undefined) money = data.money;
+  if (data.myTeam) myTeam = data.myTeam.map(function(m) { return { ...m }; });
+  if (data.badges !== undefined) badges = [ ...data.badges ];
+  if (data.pcBoxes) pcBoxes = data.pcBoxes.map(function(b) { return [ ...b ]; });
+  if (data.eggs) eggs = [ ...data.eggs ];
+  if (data.pokedexSeen) pokedexSeen = new Set(data.pokedexSeen);
+  if (data.pokedexCaught) pokedexCaught = new Set(data.pokedexCaught);
+  if (data.quests) quests = [ ...data.quests ];
+  if (data.questProgress) questProgress = { ...data.questProgress };
+  if (data.completedQuests) completedQuests = [ ...data.completedQuests ];
+  if (data.currentLocationId) currentLocationId = data.currentLocationId;
+  if (data.currentRegion) currentRegion = data.currentRegion;
+  if (data.tutorialStep !== undefined) tutorialStep = data.tutorialStep;
+  if (data.trainerNickname) trainerNickname = data.trainerNickname;
+  inventory["credit"] = money;
+  renderLocation(currentLocationId);
+  renderTeamGrid();
+  updateInventoryDisplay();
+  updateMoneyDisplay();
+  updateBadgeDisplay();
+  autoSave();
+  console.log("[dev] Game state loaded from test data");
+};
+
 // Авто-список ID локаций
 window.locations = function() {
   const all = [];
@@ -251,6 +279,14 @@ window.locations = function() {
 window.myId = function() { console.log('Твой Telegram ID:', tgUser?.id || 'не авторизован'); console.log('Твой username:', tgUser?.username || 'нет'); return tgUser?.id; };
 window.adminAdd = function(id) { if(!id) { console.log('Используй: adminAdd(ТВОЙ_ID_ИЗ_myId())'); return; } ADMIN_IDS.add(id); console.log('Админ добавлен:', id); };
 window.adminList = function() { console.log('Админы:', Array.from(ADMIN_IDS)); return Array.from(ADMIN_IDS); };
+
+// Expose functions for tests
+window.getItemQty = getItemQty;
+window.addItem = addItem;
+window.removeItem = removeItem;
+window.itemDef = itemDef;
+window.toggleExpShare = toggleExpShare;
+window.showGymRewardSelection = showGymRewardSelection;
 
 console.log('🛠 PokeMatrix Admin готов. Введи help() для списка команд.');
 console.log('📱 Твой Telegram ID: введи myId()');
@@ -1344,9 +1380,6 @@ async function checkBreeding() {
           parent2Uid: existingPair.mon2Uid
         };
         eggs.push(egg);
-        // Permanent breed mark — once bred, never again
-        if (m1) m1.hasBred = true;
-        if (m2) m2.hasBred = true;
         addNotification('🥚 Новое яйцо!', `В Боксе ${boxIdx + 1} появилось яйцо ${species}!`);
         appendToLog(`🥚 В Боксе ${boxIdx + 1} появилось яйцо! (${species})`, false, 'quest');
       }
@@ -1360,8 +1393,6 @@ async function checkBreeding() {
         for (let j = i + 1; j < box.length; j++) {
           const m1 = box[i], m2 = box[j];
           if (!m1.apiData || !m2.apiData) continue;
-          // Skip pokemon that have already bred — permanent sterility
-          if (m1.hasBred || m2.hasBred) continue;
           const groups1 = await getMonEggGroups(m1);
           const groups2 = await getMonEggGroups(m2);
           if (areBreedingCompatible(m1, m2, groups1, groups2)) {
@@ -1427,6 +1458,9 @@ export async function hatchEgg(egg) {
       isEgg: false,
       hasBred: false
     };
+    // Remove egg from team to prevent duplication
+    const eggIdx = myTeam.findIndex(m => m.uid === egg.uid);
+    if (eggIdx !== -1) myTeam.splice(eggIdx, 1);
     // Inherit one random IV from each parent
     if (egg.parent1Uid && egg.parent2Uid) {
       const allMons = [...myTeam, ...pcBoxes.flat()];
@@ -1534,9 +1568,13 @@ function openPC() {
   const teamCount = document.getElementById('pc-team-count');
   teamCount.innerText = `(В команде: ${myTeam.length}/6)`;
 
+  const breedingBoxes = new Set(breedingPairs.map(p => p.boxIdx));
+  const eggBoxes = new Set(eggs.filter(e => !e.inTeam).map(e => e.boxIdx));
   tabsContainer.innerHTML = '<span class="pc-tab active" data-box="team">Команда</span>';
   pcBoxes.forEach((box, i) => {
-    tabsContainer.innerHTML += `<span class="pc-tab" data-box="${i}">Бокс ${i + 1}</span>`;
+    const breedIcon = breedingBoxes.has(i) ? ' ❤️' : '';
+    const eggIcon = eggBoxes.has(i) ? ' 🥚' : '';
+    tabsContainer.innerHTML += `<span class="pc-tab" data-box="${i}">Бокс ${i + 1}${breedIcon}${eggIcon}</span>`;
   });
   tabsContainer.innerHTML += '<span class="pc-tab" id="btn-pc-new-box">+ Новый бокс</span>';
 
@@ -1597,6 +1635,25 @@ function renderPCSlots(view) {
     const boxIdx = parseInt(view);
     const box = pcBoxes[boxIdx];
     if (!box) return;
+
+    // Show breeding pair progress
+    const pair = breedingPairs.find(p => p.boxIdx === boxIdx);
+    if (pair) {
+      const remaining = Math.max(0, Math.ceil((pair.readyTime - Date.now()) / 60000));
+      const progressDiv = document.createElement('div');
+      progressDiv.style.cssText = 'text-align:center;padding:8px;margin-bottom:8px;background:#ff950022;border:1px solid #ff9500;border-radius:8px;font-size:0.9rem;';
+      progressDiv.innerText = `❤️ Пара найдена! Яйцо через ~${remaining} мин.`;
+      container.appendChild(progressDiv);
+    } else {
+      // Show "no pair" hint if box has 2+ mons
+      const breedable = box.filter(m => m.apiData);
+      if (breedable.length >= 2) {
+        const hintDiv = document.createElement('div');
+        hintDiv.style.cssText = 'text-align:center;padding:6px;margin-bottom:8px;color:var(--tma-text-muted);font-size:0.8rem;border:1px dashed #555;border-radius:8px;';
+        hintDiv.innerText = '💕 В этом боксе есть покемоны, но пара ещё не образовалась. Попробуйте переместить их или закройте/откройте PC.';
+        container.appendChild(hintDiv);
+      }
+    }
 
     // Show eggs in this box
     const boxEggs = eggs.filter(e => e.boxIdx === boxIdx && !e.inTeam);
@@ -1806,7 +1863,7 @@ function getFullSaveData() {
       breedLetter: m.breedLetter, gender: m.gender, status: m.status, sleepTurns: m.sleepTurns,
       movesPP: m.movesPP, statStages: m.statStages, abilityName: m.abilityName,
       heldItem: m.heldItem, berries: m.berries, learnableMoves: m.learnableMoves,
-      _learnableFetched: m._learnableFetched,
+      lastMoveCheckLevel: m.lastMoveCheckLevel,
     })),
     currentPokemonIndex,
     pokedexSeen: Array.from(pokedexSeen),
@@ -1823,6 +1880,7 @@ function getFullSaveData() {
       status: m.status, sleepTurns: m.sleepTurns, movesPP: m.movesPP,
       statStages: m.statStages, abilityName: m.abilityName, heldItem: m.heldItem,
       berries: m.berries, learnableMoves: m.learnableMoves,
+      lastMoveCheckLevel: m.lastMoveCheckLevel,
     }))),
     daycareMons, daycareEgg, lastLocation, expShareActive,
     breedingPairs: breedingPairs.map(p => ({ boxIdx: p.boxIdx, mon1Uid: p.mon1Uid, mon2Uid: p.mon2Uid, startTime: p.startTime, readyTime: p.readyTime })),
@@ -1930,8 +1988,10 @@ function loadGame() {
     }
     ITEMS.forEach(item => { if (!(item.id in inventory)) inventory[item.id] = 0; });
     syncOldInventory();
-    money = inventory['credit'] ?? data.money ?? 500;
-    if (inventory['credit'] === undefined) inventory['credit'] = money;
+    // Money: data.money is canonical, credit is a mirror — don't let credit=0 override data.money
+    money = data.money ?? inventory['credit'] ?? 500;
+    if (money === 0 && data.money > 0) money = data.money;
+    inventory['credit'] = money;
     badges = data.badges || [];
     trainerNickname = data.trainerNickname || '';
     myTeam = data.myTeam || [];
@@ -1942,6 +2002,7 @@ function loadGame() {
       if (!m.learnableMoves) m.learnableMoves = [];
       if (!m.berries) m.berries = { sitrusBerry: 0, oranBerry: 0, lumBerry: 0, chestoBerry: 0, rawstBerry: 0 };
       if (m.currentHp === undefined || m.currentHp < 0) m.currentHp = m.maxHp || 50;
+      if (!m.lastMoveCheckLevel) m.lastMoveCheckLevel = m.baseLevel || 1;
     });
     currentPokemonIndex = data.currentPokemonIndex ?? null;
     pokedexSeen = new Set(data.pokedexSeen || []);
@@ -2092,6 +2153,8 @@ async function giveStarterMon(pokemonName) {
 
     const exp = Math.pow(baseLevel, 3);
     const expToNext = Math.pow(baseLevel + 1, 3);
+    const baseHp = starterData.stats[0].base_stat;
+    const maxHp = Math.floor(0.01 * (2 * baseHp + 30) * baseLevel) + baseLevel + 10;
 
     const newMon = {
       uid: generateUID(),
@@ -2099,8 +2162,8 @@ async function giveStarterMon(pokemonName) {
       createdAt: Date.now(),
       caughtLocation: currentLocationId,
       apiData: starterData,
-      maxHp: 100,
-      currentHp: 100,
+      maxHp,
+      currentHp: maxHp,
       ivs: { hp: 30, atk: 31, def: 31, spa: 31, spd: 31, spe: 31 },
       evs: { hp: 0, atk: 0, def: 0, spa: 0, spd: 0, spe: 0 },
       baseLevel: baseLevel,
@@ -2141,6 +2204,11 @@ async function giveStarterMon(pokemonName) {
     renderLocation(currentLocationId);
     renderTeamGrid();
     autoSave();
+    fetch('/api/auth/register', {
+      method: 'POST',
+      headers: { ...getCloudAuthHeaders(), 'Content-Type': 'application/json' },
+      body: JSON.stringify({ starterPokemon: pokemonName })
+    }).catch(() => {});
   } catch (e) {
     console.error('Failed to give starter', e);
   }
@@ -4427,7 +4495,7 @@ function initTradeSocket() {
           const idx = myTeam.findIndex(m => m.uid === offer.data.uid || m === offer.data);
           if (idx !== -1) myTeam.splice(idx, 1);
         } else if (offer.type === 'item') {
-          removeItem(offer.data.id, offer.data.qty || 1);
+          removeItem(offer.data.id, offer.data.qty || 1); if (offer.data.id === 'credit') money -= offer.data.qty || 1;
         }
       });
     }
@@ -4448,13 +4516,13 @@ function initTradeSocket() {
             addNotification('📦 Покемон в PC', `${offer.data.name || 'Покемон'} отправлен в Бокс 1 (команда полна).`);
           }
         } else if (offer.type === 'item') {
-          addItem(offer.data.id, offer.data.qty || 1);
+          addItem(offer.data.id, offer.data.qty || 1); if (offer.data.id === 'credit') money += offer.data.qty || 1;
           showToast(`Получено: ${offer.data.name} x${offer.data.qty || 1}!`, false);
         }
       });
     }
 
-    showToast('Обмен успешно завершён!', false);
+    showToast('Обмен успешно завершён!', false); closeTradeWindow(); updateMoneyDisplay(); autoSave(); refreshProfileUI();
     closeTradeWindow();
     autoSave();
     refreshProfileUI();
@@ -4827,17 +4895,29 @@ function renderTradeItemGrid() {
     `;
 
     card.addEventListener('click', () => {
-      // Toggle item in offers array
-      if (offeredItemIds.has(item.id)) {
-        myTradeOffers = myTradeOffers.filter(o => !(o.type === 'item' && o.data.id === item.id));
-      } else {
-        myTradeOffers.push({ type: 'item', data: { id: item.id, name: item.nameRu, qty: 1 } });
-      }
-      socket.emit('trade_offer', { tradeId: activeTradeId, offers: myTradeOffers });
-      renderTradeOffers();
-      renderTradeItemGrid();
-      renderTradePickGrid();
-    });
+          if (item.id === 'credit') {
+            const amount = prompt('Сколько кредитов (¥) отправить? Макс: ' + (inventory['credit'] || 0), '1000');
+            if (!amount || isNaN(amount) || parseInt(amount) <= 0) return;
+            const qty = Math.min(parseInt(amount), inventory['credit'] || 0);
+            if (qty <= 0) { showToast('Недостаточно кредитов!', true); return; }
+            myTradeOffers = myTradeOffers.filter(o => !(o.type === 'item' && o.data.id === 'credit'));
+            myTradeOffers.push({ type: 'item', data: { id: 'credit', name: '¥ Кредиты', qty } });
+            socket.emit('trade_offer', { tradeId: activeTradeId, offers: myTradeOffers });
+            renderTradeOffers();
+            renderTradeItemGrid();
+            renderTradePickGrid();
+          } else {
+            if (offeredItemIds.has(item.id)) {
+              myTradeOffers = myTradeOffers.filter(o => !(o.type === 'item' && o.data.id === item.id));
+            } else {
+              myTradeOffers.push({ type: 'item', data: { id: item.id, name: item.nameRu, qty: 1 } });
+            }
+            socket.emit('trade_offer', { tradeId: activeTradeId, offers: myTradeOffers });
+            renderTradeOffers();
+            renderTradeItemGrid();
+            renderTradePickGrid();
+          }
+        });
 
     grid.appendChild(card);
   });

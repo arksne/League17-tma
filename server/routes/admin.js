@@ -9,8 +9,8 @@ import { fileURLToPath } from 'url';
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const router = Router();
 
-const ADMIN_USERNAMES = new Set(['DjafarAdjarov', 'nineinchkn5atmythroat']);
-const ADMIN_PASS = process.env.ADMIN_PASS || 'league17admin2026';
+const ADMIN_USERNAMES = (process.env.ADMIN_USERNAMES || 'DjafarAdjarov,nineinchkn5atmythroat').split(',');
+const ADMIN_PASS = process.env.ADMIN_PASS;
 
 function decompressSave(raw) {
   if (!raw) return null;
@@ -26,13 +26,21 @@ try { ADMIN_HTML = readFileSync(join(__dirname, 'admin.html'), 'utf8'); } catch(
 
 function adminAuth(req, res, next) {
   const token = req.query.token || req.headers['x-admin-token'];
-  if (token === ADMIN_PASS) return next();
+  if (ADMIN_PASS && token === ADMIN_PASS) return next();
+  if (!ADMIN_PASS && !token) {
+    return authMiddleware(req, res, async () => {
+      const db = getDB();
+      const user = await db.get('SELECT username FROM users WHERE id = ?', req.userId);
+      if (user && ADMIN_USERNAMES.includes(user.username)) { req.adminUsername = user.username; return next(); }
+      return res.status(403).json({ error: 'Admin access required' });
+    });
+  }
   if (req.path === '/' && !token) return res.send(loginPage());
   if (!token) {
     return authMiddleware(req, res, async () => {
       const db = getDB();
       const user = await db.get('SELECT username FROM users WHERE id = ?', req.userId);
-      if (user && ADMIN_USERNAMES.has(user.username)) { req.adminUsername = user.username; return next(); }
+      if (user && ADMIN_USERNAMES.includes(user.username)) { req.adminUsername = user.username; return next(); }
       return res.status(403).json({ error: 'Admin access required' });
     });
   }
@@ -417,7 +425,7 @@ router.get('/api', adminAuth, async (req, res) => {
   res.json(result);
 });
 
-// POST for raw JSON save
+// POST for raw JSON save (admin only)
 router.post('/api', adminAuth, async (req, res) => {
   const { cmd, user } = req.query;
   const db = getDB();
@@ -432,7 +440,23 @@ router.post('/api', adminAuth, async (req, res) => {
   try {
     const u = await resolveUser(user);
     if (!u) return res.json({ error: 'User not found' });
-    await db.run('UPDATE game_saves SET save_data = ?, updated_at = datetime(\'now\') WHERE user_id = ?', JSON.stringify(req.body), u.id);
+    // Validate that body is a non-null object with required save fields
+    const data = req.body;
+    if (!data || typeof data !== 'object' || Array.isArray(data)) {
+      return res.status(400).json({ error: 'Body must be a JSON object' });
+    }
+    if (data.myTeam && !Array.isArray(data.myTeam)) {
+      return res.status(400).json({ error: 'myTeam must be an array' });
+    }
+    if (data.money !== undefined && typeof data.money !== 'number') {
+      return res.status(400).json({ error: 'money must be a number' });
+    }
+    // Size limit: 10MB
+    const raw = JSON.stringify(data);
+    if (raw.length > 10 * 1024 * 1024) {
+      return res.status(400).json({ error: 'Save data too large' });
+    }
+    await db.run('UPDATE game_saves SET save_data = ?, updated_at = datetime(\'now\') WHERE user_id = ?', raw, u.id);
     res.json({ status: 'ok', saved: true });
   } catch(e) { res.json({ error: e.message }); }
 });

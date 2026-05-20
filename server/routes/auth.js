@@ -88,12 +88,24 @@ router.post('/register', authMiddleware, async (req, res) => {
     const user = await db.get('SELECT * FROM users WHERE id = ?', req.userId);
     if (!user) return res.status(404).json({ error: 'User not found' });
 
-    await db.run(
-      `UPDATE users SET nickname = ?, avatar = ?, starter_pokemon = ?, registered = 1, registered_at = datetime('now') WHERE id = ?`,
-      nickname || user.first_name || '', avatar || '👤', starterPokemon || '', req.userId
-    );
+    // Partial update: only set provided fields, don't overwrite existing
+    const sets = [];
+    const params = [];
+    if (nickname !== undefined) { sets.push('nickname = ?'); params.push(nickname); }
+    if (avatar !== undefined) { sets.push('avatar = ?'); params.push(avatar); }
+    if (starterPokemon !== undefined) { sets.push('starter_pokemon = ?'); params.push(starterPokemon); }
+    // Always ensure registered=1 and registered_at on first registration
+    if (!user.registered) {
+      sets.push('registered = 1');
+      sets.push("registered_at = datetime('now')");
+    }
+    if (sets.length > 0) {
+      params.push(req.userId);
+      await db.run(`UPDATE users SET ${sets.join(', ')} WHERE id = ?`, ...params);
+    }
 
-    res.json({ success: true, user: { ...user, nickname: nickname || user.first_name, avatar: avatar || '👤', registered: 1 } });
+    const updated = await db.get('SELECT * FROM users WHERE id = ?', req.userId);
+    res.json({ success: true, user: updated });
   } catch (err) {
     console.error('Register error:', err);
     res.status(500).json({ error: 'Internal server error' });
