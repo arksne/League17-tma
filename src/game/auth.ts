@@ -21,7 +21,7 @@ export function showLoginScreen(message: string, isError: boolean) {
     <div class="text-center p-24" style="max-width:320px;">
       <div class="fs-4 mb-16">${isError ? '🔒' : '🐾'}</div>
       <h2 class="m-0-0-8">PokeMatrix</h2>
-      <p class="text-muted" class="m-0-0-20 fs-09">${message}</p>
+      <p class="text-muted m-0-0-20 fs-09">${message}</p>
       ${isError ? '<p class="text-muted fs-08">Откройте игру через Telegram бота</p>' : '<div class="login-spinner" style="width:32px;height:32px;border:3px solid var(--tma-border);border-top-color:var(--tma-primary);border-radius:50%;margin:0 auto;animation:spin 0.8s linear infinite;"></div>'}
     </div>
   `;
@@ -48,10 +48,10 @@ export async function showRegistrationScreen(tgData: any): Promise<boolean> {
         <p class="text-muted" style="margin:0 0 20px;font-size:0.85rem;">Давай создадим твой профиль тренера</p>
 
         <div class="text-left mb-16">
-          <label class="text-muted" class="fs-08">Прозвище тренера</label>
+          <label class="text-muted fs-08">Прозвище тренера</label>
           <input id="reg-nickname" type="text" value="${tgData.first_name || tgData.username || ''}" maxlength="20" class="w-full p-10 m-4-0-12 border-card fs-1" style="color:var(--tma-text);">
 
-          <label class="text-muted" class="fs-08">Аватар</label>
+          <label class="text-muted fs-08">Аватар</label>
           <div class="d-flex flex-gap-8" style="margin:4px 0 8px;">
             <div id="reg-avatar-preview" style="width:56px;height:56px;border-radius:50%;background:var(--tma-card-bg);display:flex;align-items:center;justify-content:center;font-size:2rem;border:2px solid var(--tma-primary);flex-shrink:0;">👤</div>
             <input type="file" id="reg-avatar-file" accept="image/*" style="display:none;">
@@ -164,28 +164,50 @@ export async function authTelegram() {
   const isLocalhost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
   const devMode = new URLSearchParams(window.location.search).has('dev');
 
-  if (!(window as any).Telegram || !(window as any).Telegram.WebApp || !(window as any).Telegram.WebApp.initData) {
+  if (!(window as any).Telegram || !(window as any).Telegram.WebApp) {
     if (isLocalhost || devMode) {
       console.log('🔧 Dev mode: bypassing Telegram auth');
     } else {
-      showLoginScreen('Игра доступна только через Telegram', true);
+      showLoginScreen('Игра доступна только через Telegram Mini App. Откройте через бота.', true);
       return;
+    }
+  }
+
+  if (!(window as any).Telegram?.WebApp?.initData) {
+    if (isLocalhost || devMode) {
+      console.log('🔧 Dev mode: no initData, using test');
+    } else {
+      // Try expanding the TMA — some clients initData is delayed
+      try { (window as any).Telegram.WebApp.ready(); } catch(_) {}
+      // Give a brief moment for initData to become available
+      await new Promise(r => setTimeout(r, 300));
+      if (!(window as any).Telegram?.WebApp?.initData) {
+        showLoginScreen('Ошибка инициализации Telegram. Попробуйте перезапустить бота.', true);
+        return;
+      }
     }
   }
 
   try {
     // In dev mode, use injected Telegram data (for multi-trainer testing) or fall back to 'test'
-    let initData;
+    let initData: string;
     if (isLocalhost || devMode) {
       initData = (window as any).Telegram?.WebApp?.initData || 'test';
     } else {
       initData = (window as any).Telegram.WebApp.initData;
     }
+
+    // Create abort controller with 15s timeout to prevent indefinite hang
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 15000);
+
     const res = await fetch(`${API_BASE}/auth/tg`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ initData: initData })
+      body: JSON.stringify({ initData: initData }),
+      signal: controller.signal
     });
+    clearTimeout(timeoutId);
     if (!res.ok) {
       showLoginScreen('Ошибка авторизации. Попробуйте перезапустить бота.', true);
       return;
@@ -214,8 +236,19 @@ export async function authTelegram() {
         state.isAdmin = adminData.isAdmin;
       }
     } catch(_) { /* admin check failure is non-fatal */ }
-  } catch (e) {
+  } catch (e: any) {
     console.warn('Auth failed (offline?)', e);
-    showLoginScreen('Нет соединения с сервером. Проверьте интернет.', true);
+    // Report the error to the server for diagnostics
+    try {
+      navigator.sendBeacon('/api/log-client-error', JSON.stringify({
+        msg: 'Auth fetch failed: ' + (e?.name || e?.message || 'unknown'),
+        stack: e?.stack || '', url: location.href, time: Date.now()
+      }));
+    } catch(_) {}
+    if (e?.name === 'AbortError') {
+      showLoginScreen('Сервер не отвечает (таймаут). Попробуйте позже.', true);
+    } else {
+      showLoginScreen('Нет соединения с сервером. Проверьте интернет.', true);
+    }
   }
 }

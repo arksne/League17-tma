@@ -4,7 +4,7 @@
     "buildCommand": "npm run build"
   },
   "deploy": {
-    "startCommand": "node server/scripts/export-game-data.mjs && node server/index.js",
+    "startCommand": "node server/migrate.js && node server/scripts/export-game-data.mjs && node server/index.js",
     "restartPolicyType": "ON_FAILURE",
     "restartPolicyMaxRetries": 10
   }

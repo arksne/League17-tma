@@ -83,9 +83,12 @@ app.get('/api/health', async (req, res) => {
 });
 
 // PokeAPI proxy with SQLite cache
-app.get('/api/pokeapi/{*path}', async (req, res) => {
+// Express 5 (path-to-regexp v8) does not support `{*path}` syntax.
+// Use app.use with mount path so req.path is relative to mount point.
+app.use('/api/pokeapi', async (req, res, next) => {
+  if (req.method !== 'GET') return next();
   try {
-    const apiPath = req.path.replace('/api/pokeapi/', '');
+    const apiPath = req.path.replace(/^\//, '');
     if (!apiPath) return res.status(400).json({ error: 'Missing path' });
 
     const db = getDB();

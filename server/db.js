@@ -147,6 +147,17 @@ export async function initDB(retries = 3) {
   `); } catch (e) { /* ignore */ }
 
   try { await db.exec(`
+    CREATE TABLE IF NOT EXISTS refresh_tokens (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id INTEGER NOT NULL,
+      token TEXT NOT NULL UNIQUE,
+      expires_at TEXT NOT NULL,
+      created_at TEXT DEFAULT (datetime('now')),
+      FOREIGN KEY (user_id) REFERENCES users(id)
+    );
+  `); } catch (e) { /* ignore */ }
+
+  try { await db.exec(`
     CREATE TABLE IF NOT EXISTS achievements (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       user_id INTEGER NOT NULL,
