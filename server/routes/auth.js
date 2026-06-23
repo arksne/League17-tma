@@ -45,18 +45,20 @@ router.post('/tg', asyncHandler(async (req, res) => {
     if (initData && initData.startsWith('{') && !isProduction) {
       tgUser = parseTestUser(initData);
     } else if (!isRealInitData) {
-      if (initData === 'test' && !isProduction) {
-        // Dev mode: bypass Telegram auth
-        tgUser = parseTestUser();
-      } else if (isProduction) {
-        return res.status(403).json({ error: 'Telegram authentication required in production' });
+      if (initData === 'test') {
+        // Dev/demo mode: bypass Telegram auth when no BOT_TOKEN or explicitly allowed
+        if (!botToken) {
+          logger.warn('BOT_TOKEN not set — allowing dev login. Set BOT_TOKEN for production Telegram auth.');
+          tgUser = parseTestUser();
+        } else if (!isProduction) {
+          tgUser = parseTestUser();
+        } else {
+          return res.status(403).json({ error: 'Telegram authentication required in production' });
+        }
       } else {
         return res.status(403).json({ error: 'Telegram authentication required' });
       }
     } else if (!botToken) {
-      if (isProduction) {
-        return res.status(500).json({ error: 'BOT_TOKEN not configured' });
-      }
       logger.warn('BOT_TOKEN is not set — Telegram init data verification is SKIPPED. Set BOT_TOKEN in production!');
       tgUser = parseTestUser(initData);
     } else {
