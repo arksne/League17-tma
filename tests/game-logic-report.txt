@@ -1,0 +1,159 @@
+=== GAME LOGIC COMPREHENSIVE TEST ===
+
+Starting 20 game logic tests at 2026-05-21T13:36:54.778Z
+
+
+--- Test 1/20: Item - Potion heals HP ---
+  FAIL: page.evaluate: Error: __openPokemonProfile not found
+    at eval (eval at evaluate (:302:30), <anonymous>:5:13)
+    at UtilityScript.evaluate (<anonymous>:304:16)
+    at UtilityScript.<anonymous> (<anonymous>:1:44)
+  Stack: page.evaluate: Error: __openPokemonProfile not found ->     at eval (eval at evaluate (:302:30), <anonymous>:5:13)
+
+--- Test 2/20: Item - Candy increases level ---
+  FAIL: page.evaluate: Error: __openPokemonProfile not found
+    at eval (eval at evaluate (:302:30), <anonymous>:5:13)
+    at UtilityScript.evaluate (<anonymous>:304:16)
+    at UtilityScript.<anonymous> (<anonymous>:1:44)
+  Stack: page.evaluate: Error: __openPokemonProfile not found ->     at eval (eval at evaluate (:302:30), <anonymous>:5:13)
+
+--- Test 3/20: Item - Full Restore heals + cures status ---
+  FAIL: page.evaluate: Error: __openPokemonProfile not found
+    at eval (eval at evaluate (:302:30), <anonymous>:5:13)
+    at UtilityScript.evaluate (<anonymous>:304:16)
+    at UtilityScript.<anonymous> (<anonymous>:1:44)
+  Stack: page.evaluate: Error: __openPokemonProfile not found ->     at eval (eval at evaluate (:302:30), <anonymous>:5:13)
+
+--- Test 4/20: Item - Vitamin increases EV total ---
+  FAIL: page.evaluate: Error: __openPokemonProfile not found
+    at eval (eval at evaluate (:302:30), <anonymous>:5:13)
+    at UtilityScript.evaluate (<anonymous>:304:16)
+    at UtilityScript.<anonymous> (<anonymous>:1:44)
+  Stack: page.evaluate: Error: __openPokemonProfile not found ->     at eval (eval at evaluate (:302:30), <anonymous>:5:13)
+
+--- Test 5/20: Item - Training increases stage ---
+  FAIL: page.evaluate: Error: __openPokemonProfile not found
+    at eval (eval at evaluate (:302:30), <anonymous>:5:13)
+    at UtilityScript.evaluate (<anonymous>:304:16)
+    at UtilityScript.<anonymous> (<anonymous>:1:44)
+  Stack: page.evaluate: Error: __openPokemonProfile not found ->     at eval (eval at evaluate (:302:30), <anonymous>:5:13)
+
+--- Test 6/20: Item - Evolution Stone button exists ---
+  FAIL: page.evaluate: Error: __openPokemonProfile not found
+    at eval (eval at evaluate (:302:30), <anonymous>:5:13)
+    at UtilityScript.evaluate (<anonymous>:304:16)
+    at UtilityScript.<anonymous> (<anonymous>:1:44)
+  Stack: page.evaluate: Error: __openPokemonProfile not found ->     at eval (eval at evaluate (:302:30), <anonymous>:5:13)
+
+--- Test 7/20: Battle - Start wild encounter ---
+  FAIL: page.evaluate: Error: __triggerEncounter not found
+    at eval (eval at evaluate (:302:30), <anonymous>:5:13)
+    at UtilityScript.evaluate (<anonymous>:304:16)
+    at UtilityScript.<anonymous> (<anonymous>:1:44)
+  Stack: page.evaluate: Error: __triggerEncounter not found ->     at eval (eval at evaluate (:302:30), <anonymous>:5:13)
+
+--- Test 8/20: Battle - Catch wild pokemon ---
+  FAIL: page.evaluate: TypeError: window.__triggerEncounter is not a function
+    at eval (eval at evaluate (:302:30), <anonymous>:1:14)
+    at UtilityScript.evaluate (<anonymous>:304:16)
+    at UtilityScript.<anonymous> (<anonymous>:1:44)
+  Stack: page.evaluate: TypeError: window.__triggerEncounter is not a function ->     at eval (eval at evaluate (:302:30), <anonymous>:1:14)
+
+--- Test 9/20: PC - Open PC Box storage ---
+  FAIL: page.evaluate: Error: __openPC not found
+    at eval (eval at evaluate (:302:30), <anonymous>:5:13)
+    at UtilityScript.evaluate (<anonymous>:304:16)
+    at UtilityScript.<anonymous> (<anonymous>:1:44)
+  Stack: page.evaluate: Error: __openPC not found ->     at eval (eval at evaluate (:302:30), <anonymous>:5:13)
+
+--- Test 10/20: Pokedex - Open and verify entries ---
+  Pokedex button visible: true
+  Pokedex count: Поймано: 1 / 1051
+  Pokedex entries rendered: 1051
+  Caught-only entries: 1
+  Errors: none
+  Result: PASS
+
+--- Test 11/20: Pokecenter - Location features ---
+  Heal button visible: true
+  NPC panel visible: true
+  NPC buttons: 5
+  window.__openPC available: false
+  FAIL: window.__openPC not available
+  Stack: Error: window.__openPC not available ->     at /home/arksne/Документы/Pokematrix/league17/tests/game-logic-test.cjs:575:27
+
+--- Test 12/20: Quests - Open and verify quest UI ---
+  Quests button visible: true
+  Quest modal visible: true
+  Quest content: Поймать 5 покемонов (2/5)
+Награда: ¥500
+В процессе...
+  Errors: none
+  Result: PASS
+
+--- Test 13/20: Weather - Display and location weather ---
+  Current weather: 🌧️ Дождь
+  Valid weather icon: true
+  Errors: none
+  Result: PASS
+
+--- Test 14/20: Inventory - All items render correctly ---
+  Inventory items displayed: 18
+  Inventory text length: 344
+  Named items found in inventory: 6/10
+  Zero-qty item (expShare) hidden: true
+  Errors: none
+  Result: PASS
+
+--- Test 15/20: Item - TM button opens move relearner ---
+  FAIL: page.evaluate: Error: __openPokemonProfile not found
+    at eval (eval at evaluate (:302:30), <anonymous>:5:13)
+    at UtilityScript.evaluate (<anonymous>:304:16)
+    at UtilityScript.<anonymous> (<anonymous>:1:44)
+  Stack: page.evaluate: Error: __openPokemonProfile not found ->     at eval (eval at evaluate (:302:30), <anonymous>:5:13)
+
+--- Test 16/20: Battle - Type effectiveness + Stat calc ---
+  Expected charizard HP (base=78, IV=20, lv=36): 109
+  Actual max HP from profile: 0
+  Team HP display: 
+  Weather display: 🌧️ Дождь
+  EV formula verified in Test 4
+  Errors: none
+  Result: PASS
+
+--- Test 17/20: Economy - Money and Badge display ---
+  Money display: ¥9999
+  Badge icons found: 0
+  Badge container children: -1
+  Money display after verify: ¥9999
+  Badge DOM elements: 0
+  Errors: none
+  Result: PASS
+
+--- Test 18/20: Evolution - Stone triggers check ---
+  FAIL: page.evaluate: TypeError: window.__openPC is not a function
+    at eval (eval at evaluate (:302:30), <anonymous>:1:14)
+    at UtilityScript.evaluate (<anonymous>:304:16)
+    at UtilityScript.<anonymous> (<anonymous>:1:44)
+  Stack: page.evaluate: TypeError: window.__openPC is not a function ->     at eval (eval at evaluate (:302:30), <anonymous>:1:14)
+
+--- Test 19/20: World - Location link navigation ---
+  Starting location: 🌙 Голденрод
+  Available routes: Дорога №1, Дорога №2, Дорога №3, Дорога №4, Дорога №8, 🏠 Тюрьма, 🏠 Покецентр, 🏠 Супермаркет, 🏠 Научный институт, 🏠 Академия Тренеров Покемонов, 🏠 Бар, 🏠 Мэрия, 🏠 Обычный Стадион, 🎫 🚂 Поезд в Канто (Шаффран)
+  Clicking link: ➔ Дорога №1
+  New location: 🌙 Дорога №1
+  Errors: none
+  Result: PASS
+
+--- Test 20/20: Battle - Team switch and faint ---
+  FAIL: page.evaluate: TypeError: window.__triggerEncounter is not a function
+    at eval (eval at evaluate (:302:30), <anonymous>:1:14)
+    at UtilityScript.evaluate (<anonymous>:304:16)
+    at UtilityScript.<anonymous> (<anonymous>:1:44)
+  Stack: page.evaluate: TypeError: window.__triggerEncounter is not a function ->     at eval (eval at evaluate (:302:30), <anonymous>:1:14)
+
+
+=== FINAL SUMMARY ===
+  Passed: 7/20
+  Failed: 13/20
+  Completed at: 2026-05-21T13:38:41.200Z

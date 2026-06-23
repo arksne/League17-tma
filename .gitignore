@@ -1,4 +1,5 @@
 node_modules/
+dist/
 *.log
 .DS_Store
 /data/
@@ -6,3 +7,25 @@ wiki_data/
 
 # Database files
 *.db
+
+# Python cache
+__pycache__/
+*.pyc
+
+# Test artifacts
+test-results/
+*.bak
+*.bkp
+
+# Railway
+.railpack_compat/
+railpack/
+
+# Graphify generated files
+graphify-out/
+
+# Environment
+.env
+.env.local
+.npmrc
+e2e/screenshots/

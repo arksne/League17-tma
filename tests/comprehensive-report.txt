@@ -1,0 +1,105 @@
+=== COMPREHENSIVE GAME LOGIC TEST ===
+
+Starting 10 comprehensive tests at 2026-05-21T11:07:39.923Z
+
+
+--- Running test 1/10 ---
+
+=== TEST 1: Wild Encounter ===
+  Location: ☀️ Голденрод
+  Wildlife visible: false
+  Hunt button visible: true
+  Weather: 🌧️ Дождь
+  Errors: CONSOLE_WARN: Credit/money desync detected: {credit: 0, money: 99999}
+  Result: PASS (with errors)
+
+--- Running test 2/10 ---
+
+=== TEST 2: Team View & Pokemon Details ===
+  Team view active: true
+  Team count: (1/6)
+  Team slots rendered: 6
+  Pokemon name: charizard #undefined
+  HP: 180/180
+  Level: 36
+  Stats tab visible: true
+  Moves tab visible: true
+  Errors: CONSOLE_WARN: Credit/money desync detected: {credit: 0, money: 99999}
+  Result: PASS
+
+--- Running test 3/10 ---
+
+=== TEST 3: Shop System ===
+  Location actions visible: true
+  Money display: ¥5000
+  Action buttons count: 1
+  Errors: CONSOLE_WARN: Credit/money desync detected: {credit: 0, money: 99999}
+  Result: PASS
+
+--- Running test 4/10 ---
+
+=== TEST 4: Inventory & Item Usage ===
+  Dismissing starter modal...
+  Backpack view active: true
+  Inventory items visible: 5
+  Pokeball in inventory: true
+  Potion in inventory: true
+  Errors: CONSOLE_WARN: Credit/money desync detected: {credit: 0, money: 99999}
+  Result: PASS
+
+--- Running test 5/10 ---
+
+=== TEST 5: Pokemon Center Healing ===
+  Nav buttons count: 14
+  Pokecenter link visible: true
+  Navigated to: ☀️ Покецентр
+  Heal button visible: true
+  Heal button clicked
+  Errors: none
+  Result: PASS
+
+--- Running test 6/10 ---
+
+=== TEST 6: Save/Load & Cloud Sync ===
+  Money after load: ¥9999
+  Cloud sync button visible: true
+  Local save exists: true
+  Errors: none
+  Result: PASS
+
+--- Running test 7/10 ---
+
+=== TEST 7: Navigation & Region Travel ===
+  Navigation buttons: 14
+  First nav button: ➔ Дорога №1
+  Errors: none
+  Result: PASS
+
+--- Running test 8/10 ---
+
+=== TEST 8: Badges & Gym Display ===
+  Badge display: Значки (2/16): 🪨 💧
+  Money display: ¥15000
+  Errors: none
+  Result: PASS
+
+--- Running test 9/10 ---
+
+=== TEST 9: API & Console Monitoring ===
+  API errors: none
+  Console errors: none
+  Result: PASS
+
+--- Running test 10/10 ---
+
+=== TEST 10: Admin Panel ===
+  Admin page title: 
+  Admin dashboard loaded: false
+  Errors: CONSOLE_ERROR: Failed to load resource: the server responded with a status of 401 (Unauthorized)
+  Result: PASS
+
+
+=== FINAL SUMMARY ===
+  Passed: 10/10
+  Failed: 0/10
+  Completed at: 2026-05-21T11:08:52.944Z

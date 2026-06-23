@@ -12,6 +12,9 @@ let JWT_SECRET = process.env.JWT_SECRET;
 if (!JWT_SECRET) {
   try {
     JWT_SECRET = fs.readFileSync(SECRET_FILE, 'utf8').trim();
+    if (process.env.NODE_ENV === 'production') {
+      console.error('SECURITY: JWT_SECRET loaded from file. Set JWT_SECRET env var in production!');
+    }
   } catch {
     JWT_SECRET = crypto.randomBytes(32).toString('hex');
     try {
@@ -39,6 +42,10 @@ export function authMiddleware(req, res, next) {
   } catch {
     return res.status(401).json({ error: 'Invalid or expired token' });
   }
+}
+
+export function verifyToken(token) {
+  return jwt.verify(token, JWT_SECRET);
 }
 
 export function generateToken(userId, telegramId) {

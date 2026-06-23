@@ -228,7 +228,8 @@ async function loadUser() {
   currentUserId = data.userId;
   currentUsername = data.username;
   POKEDEX_ALL = data.pokedexAll || [];
-  document.getElementById('saveInfo').innerHTML = '<span style="color:#34c759">Loaded: '+esc(data.username||data.userId)+'</span> -- team: '+(currentSave.myTeam?.length||0)+' pok, PC: '+((currentSave.pcBoxes||[]).reduce(function(s,b){return s+b.length},0))+' pok, ¥'+(currentSave.money||0);
+  currentSave = currentSave || {};
+  document.getElementById('saveInfo').innerHTML = '<span style="color:#34c759">Loaded: '+esc(data.username||data.userId)+'</span> -- team: '+(currentSave?.myTeam?.length||0)+' pok, PC: '+((currentSave?.pcBoxes||[]).reduce(function(s,b){return s+b.length},0))+' pok, ¥'+(currentSave?.money||0);
   renderOverview();
   renderTeam();
   renderPC();
@@ -242,7 +243,8 @@ function switchTab(name) {
   document.querySelectorAll('.tab-btn').forEach(function(e) { e.classList.remove('active'); });
   var tab = document.getElementById('tab-'+name);
   if (tab) tab.classList.add('active');
-  event.target.classList.add('active');
+  var btn = document.querySelector('.tab-btn[onclick*="'+name+'"]');
+  if (btn) btn.classList.add('active');
   if (name === 'drops') loadDrops();
 }
 
@@ -649,7 +651,7 @@ function addDropSpecies() {
   const sel = document.getElementById('dropsAddSpecies');
   const name = sel.value;
   if (!name) return;
-  dropsConfig.monsterDrops[name] = [{ item: 'pokeball', chance: 0.05, qty: 1 }];
+  dropsConfig.monsterDrops[name] = [{ item: 'pokeBall', chance: 0.05, qty: 1 }];
   sel.value = '';
   populateAddSpeciesSelect();
   renderDrops();

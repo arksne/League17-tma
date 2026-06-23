@@ -1,0 +1,54 @@
+=== ITEM SYSTEM COMPREHENSIVE TEST ===
+
+--- Item Definition Validation ---
+
+  ✓ 1: Item data loaded
+  ✓ 2: All item IDs are unique
+  ✓ 3: All items have nameRu
+  ✓ 4: All items have valid categories
+  ✓ 5: All items have isUsable field
+  ✓ 6: All items have isBall field
+  ✓ 7: Balls exist
+  ✓ 8: All balls have ballMult > 0
+  ✓ 9: Items span multiple categories
+  ✓ 10: There are usable items
+
+--- __devSetGameState Inventory Round-Trip ---
+
+  ✓ 11: __devSetGameState captures potion:5
+  ✓ 12: __devSetGameState captures candy:3
+  ✓ 13: __devSetGameState captures fireStone:2
+  ✓ 14: __devSetGameState captures xAttack:1
+  ✓ 15: __devSetGameState captures graphiteBell:10
+  ✓ 16: __devSetGameState captures tm:7
+  ✓ 17: __devSetGameState captures money:5000
+  ✓ 18: DOM shows potion x5
+  ✓ 19: DOM shows xAttack x1
+  ✓ 20: DOM money display shows 5000
+  ✓ 21: Overwrite: DOM potion now 99
+  ✓ 22: Overwrite: DOM superPotion now 2
+  ✓ 23: Overwrite: candy no longer in DOM
+  ✓ 24: DOM money updated to 1000
+
+--- Badge & State Tests ---
+
+  ✓ 25: __devSetGameState sets 2 badges
+  ✓ 26: __devSetGameState sets money 8888
+  ✓ 27: DOM badge display is not empty
+
+--- Team State Tests ---
+
+  ✓ 28: Team state: HP 70
+  ✓ 29: Team state: heldItem null
+  ✓ 30: Team state: candiesEaten 5
+  ✓ 31: Team state: status null
+  ✓ 32: Team grid shows 1 pokemon
+
+--- Battle Items Validation ---
+
+  ✓ 33: All X-stat items defined in src/data/items.js
+  ✓ 34: Held items defined: 15/15
+
+=== RESULT: 34/34 passed ===
+
+=== RESULT: 34/34 passed ===

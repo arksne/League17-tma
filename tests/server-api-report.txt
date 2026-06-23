@@ -1,0 +1,126 @@
+=== SERVER API COMPREHENSIVE TEST ===
+
+Starting 29 server API tests at 2026-06-22T12:35:33.999Z
+
+
+--- Test 1/29: Auth - tg login creates user ---
+  JWT token: eyJhbGciOiJIUzI1NiIs...
+  User ID: 4, telegram_id: 8001
+  Result: PASS
+
+--- Test 2/29: Auth - duplicate login returns same user ---
+  Same user ID on duplicate login: 5
+  Result: PASS
+
+--- Test 3/29: Auth - register updates user ---
+  Result: PASS
+
+--- Test 4/29: Auth - partial register update ---
+  Result: PASS
+
+--- Test 5/29: Auth - invalid JWT rejected ---
+  Invalid JWT correctly rejected: 401
+  Result: PASS
+
+--- Test 6/29: Save - save/load cycle ---
+  Save/load OK: money=500 (server-authoritative), inventory={}
+  Result: PASS
+
+--- Test 7/29: Save - stale version rejected ---
+  Stale save correctly rejected: serverVersion=100, clientVersion=50
+  Result: PASS
+
+--- Test 8/29: Save - validation rejects bad data ---
+  Validation passed: empty body -> 400, oversized team -> 400, bad badges -> 400
+  Result: PASS
+
+--- Test 9/29: Chat - send and get messages ---
+  Chat messages: 13 total, last text: "Hello from test!"
+  Result: PASS
+
+--- Test 10/29: Chat - rate limiting ---
+  Rate limit triggered: true
+  Result: PASS
+
+--- Test 11/29: Chat - bot endpoint ---
+  Bot endpoint status: 401 (expected when BOT_TOKEN not set in dev)
+  Result: PASS
+
+--- Test 12/29: Chat - empty text rejected ---
+  Empty text correctly rejected: 400
+  Result: PASS
+
+--- Test 13/29: Profile - update and query location ---
+  Location update OK
+  Result: PASS
+
+--- Test 14/29: Profile - get all trainers ---
+  Trainers count: 15
+  First trainer: #17 avatar8014
+  Result: PASS
+
+--- Test 15/29: Profile - get trainer by ID ---
+  Profile: badges=1, money=undefined
+  Result: PASS
+
+--- Test 16/29: Profile - non-existent user 404 ---
+  Non-existent user correctly returns 404
+  Result: PASS
+
+--- Test 17/29: Leaderboard - returns list ---
+  Leaderboard entries: 6
+  Result: PASS
+
+--- Test 18/29: Health - server health check ---
+  Health: {"status":"ok","db":"connected","time":"2026-06-22T12:35:46.603Z"}
+  Result: PASS
+
+--- Test 19/29: Admin - health check ---
+  Admin health: {"ok":true}
+  Result: PASS
+
+--- Test 20/29: Admin - API commands with token ---
+  Admin API (no auth) status: 401 — expected
+  Result: PASS
+
+--- Test 21/29: Auth - avatar upload ---
+  Avatar upload status: 200 OK
+  Result: PASS
+
+--- Test 22/29: Auth - missing initData rejected ---
+  Missing initData correctly rejected: 403
+  Result: PASS
+
+--- Test 23/29: Profile - location update requires auth ---
+  Unauthenticated location update rejected: 401
+  Result: PASS
+
+--- Test 24/29: Chat - get messages since timestamp ---
+  Messages since 2026-06-22T11:35:48: 0
+  Result: PASS
+
+--- Test 25/29: Auth - protected routes reject without JWT ---
+  All protected routes correctly reject without JWT
+  Result: PASS
+
+--- Test 26/29: Socket.IO - connect and join lobby ---
+  FAIL: No players in lobby
+  Stack: Error: No players in lobby ->     at Object.run (D:\pokematrix\league17\tests\server-api-test.cjs:414:41) ->     at async main (D:\pokematrix\league17\tests\server-api-test.cjs:591:7)
+
+--- Test 27/29: Socket.IO - trade flow ---
+  FAIL: Could not resolve socket IDs (s1=false, s2=false)
+  Stack: Error: Could not resolve socket IDs (s1=false, s2=false) ->     at Object.run (D:\pokematrix\league17\tests\server-api-test.cjs:444:29) ->     at async main (D:\pokematrix\league17\tests\server-api-test.cjs:591:7)
+
+--- Test 28/29: Socket.IO - trade cancel ---
+  FAIL: Could not resolve P2 socket ID
+  Stack: Error: Could not resolve P2 socket ID ->     at Object.run (D:\pokematrix\league17\tests\server-api-test.cjs:504:20) ->     at async main (D:\pokematrix\league17\tests\server-api-test.cjs:591:7)
+
+--- Test 29/29: Socket.IO - PvP challenge flow ---
+  FAIL: Could not resolve P2 socket ID
+  Stack: Error: Could not resolve P2 socket ID ->     at Object.run (D:\pokematrix\league17\tests\server-api-test.cjs:541:20) ->     at async main (D:\pokematrix\league17\tests\server-api-test.cjs:591:7)
+
+
+=== FINAL SUMMARY ===
+  Passed: 25/29
+  Failed: 4/29
+  Completed at: 2026-06-22T12:35:55.962Z

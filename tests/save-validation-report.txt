@@ -1,0 +1,6 @@
+=== SAVE VALIDATION TEST ===
+
+Starting 27 save validation tests at 2026-06-02T16:33:40.121Z
+
+
+--- Test 1/27: Save - full structure round-trip ---

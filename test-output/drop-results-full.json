@@ -1,0 +1,692 @@
+{
+  "stats": {
+    "totalWithDrops": 105,
+    "totalWithoutDrops": 394,
+    "totalItems": 115,
+    "totalSpecies": 499
+  },
+  "check": {
+    "ok": 45,
+    "failed": 76,
+    "missing": [
+      {
+        "item": "twistedSpoon",
+        "qty": 0,
+        "fromSpecies": [
+          "abra",
+          "alakazam",
+          "azelf"
+        ]
+      },
+      {
+        "item": "sharpBeak",
+        "qty": 0,
+        "fromSpecies": [
+          "aerodactyl",
+          "dodrio",
+          "doduo"
+        ]
+      },
+      {
+        "item": "hardStone",
+        "qty": 0,
+        "fromSpecies": [
+          "aggron",
+          "anorith",
+          "aron"
+        ]
+      },
+      {
+        "item": "balmMushroom",
+        "qty": 0,
+        "fromSpecies": [
+          "amoonguss",
+          "foongus",
+          "paras"
+        ]
+      },
+      {
+        "item": "silverPowder",
+        "qty": 0,
+        "fromSpecies": [
+          "anorith",
+          "ariados",
+          "beautifly"
+        ]
+      },
+      {
+        "item": "poisonBarb",
+        "qty": 0,
+        "fromSpecies": [
+          "arbok",
+          "ariados",
+          "beedrill"
+        ]
+      },
+      {
+        "item": "cometShard",
+        "qty": 0,
+        "fromSpecies": [
+          "articuno",
+          "clefable",
+          "clefairy"
+        ]
+      },
+      {
+        "item": "dragonFang",
+        "qty": 0,
+        "fromSpecies": [
+          "bagon",
+          "dialga",
+          "dragonair"
+        ]
+      },
+      {
+        "item": "deepSeaTooth",
+        "qty": 0,
+        "fromSpecies": [
+          "basculin-red-striped",
+          "carvanha",
+          "huntail"
+        ]
+      },
+      {
+        "item": "metalCoat",
+        "qty": 0,
+        "fromSpecies": [
+          "beldum",
+          "bronzong",
+          "bronzor"
+        ]
+      },
+      {
+        "item": "absorbBulb",
+        "qty": 0,
+        "fromSpecies": [
+          "bellossom",
+          "cottonee",
+          "gloom"
+        ]
+      },
+      {
+        "item": "miracleSeed",
+        "qty": 0,
+        "fromSpecies": [
+          "bellsprout",
+          "bulbasaur",
+          "carnivine"
+        ]
+      },
+      {
+        "item": "kebiaBerry",
+        "qty": 0,
+        "fromSpecies": [
+          "breloom",
+          "shroomish"
+        ]
+      },
+      {
+        "item": "razorFang",
+        "qty": 0,
+        "fromSpecies": [
+          "bruxish",
+          "gligar"
+        ]
+      },
+      {
+        "item": "wacanBerry",
+        "qty": 0,
+        "fromSpecies": [
+          "buizel",
+          "floatzel"
+        ]
+      },
+      {
+        "item": "chopleBerry",
+        "qty": 0,
+        "fromSpecies": [
+          "buneary",
+          "lopunny"
+        ]
+      },
+      {
+        "item": "stickyBarb",
+        "qty": 0,
+        "fromSpecies": [
+          "cacnea",
+          "cacturne",
+          "ferroseed"
+        ]
+      },
+      {
+        "item": "cellBattery",
+        "qty": 0,
+        "fromSpecies": [
+          "charjabug",
+          "electrode",
+          "minun"
+        ]
+      },
+      {
+        "item": "metronome",
+        "qty": 0,
+        "fromSpecies": [
+          "chatot",
+          "kricketot",
+          "kricketune"
+        ]
+      },
+      {
+        "item": "colburBerry",
+        "qty": 0,
+        "fromSpecies": [
+          "chimecho",
+          "chingling"
+        ]
+      },
+      {
+        "item": "cleanseTag",
+        "qty": 0,
+        "fromSpecies": [
+          "chimecho",
+          "chingling"
+        ]
+      },
+      {
+        "item": "yellowShard",
+        "qty": 0,
+        "fromSpecies": [
+          "chinchou",
+          "lanturn"
+        ]
+      },
+      {
+        "item": "blueShard",
+        "qty": 0,
+        "fromSpecies": [
+          "clamperl",
+          "kyogre"
+        ]
+      },
+      {
+        "item": "bigPearl",
+        "qty": 0,
+        "fromSpecies": [
+          "clamperl",
+          "cloyster",
+          "gulpin"
+        ]
+      },
+      {
+        "item": "moonStone",
+        "qty": 0,
+        "fromSpecies": [
+          "clefable",
+          "clefairy",
+          "cleffa"
+        ]
+      },
+      {
+        "item": "mistySeed",
+        "qty": 0,
+        "fromSpecies": [
+          "comfey"
+        ]
+      },
+      {
+        "item": "redShard",
+        "qty": 0,
+        "fromSpecies": [
+          "corsola",
+          "groudon"
+        ]
+      },
+      {
+        "item": "blackSludge",
+        "qty": 0,
+        "fromSpecies": [
+          "croagunk",
+          "garbodor",
+          "grimer"
+        ]
+      },
+      {
+        "item": "rareBone",
+        "qty": 0,
+        "fromSpecies": [
+          "crustle",
+          "dwebble"
+        ]
+      },
+      {
+        "item": "thickClub",
+        "qty": 0,
+        "fromSpecies": [
+          "cubone",
+          "marowak",
+          "marowak-alola"
+        ]
+      },
+      {
+        "item": "softSand",
+        "qty": 0,
+        "fromSpecies": [
+          "diglett",
+          "dugtrio",
+          "gligar"
+        ]
+      },
+      {
+        "item": "passhoBerry",
+        "qty": 0,
+        "fromSpecies": [
+          "donphan",
+          "pansear",
+          "phanpy"
+        ]
+      },
+      {
+        "item": "airBalloon",
+        "qty": 0,
+        "fromSpecies": [
+          "drifblim"
+        ]
+      },
+      {
+        "item": "kasibBerry",
+        "qty": 0,
+        "fromSpecies": [
+          "dusclops",
+          "dusknoir",
+          "duskull"
+        ]
+      },
+      {
+        "item": "eviolite",
+        "qty": 0,
+        "fromSpecies": [
+          "eevee"
+        ]
+      },
+      {
+        "item": "electirizer",
+        "qty": 0,
+        "fromSpecies": [
+          "electabuzz",
+          "electivire",
+          "elekid"
+        ]
+      },
+      {
+        "item": "psychicSeed",
+        "qty": 0,
+        "fromSpecies": [
+          "exeggcute"
+        ]
+      },
+      {
+        "item": "stick",
+        "qty": 0,
+        "fromSpecies": [
+          "farfetchd"
+        ]
+      },
+      {
+        "item": "rindoBerry",
+        "qty": 0,
+        "fromSpecies": [
+          "finneon",
+          "lumineon",
+          "panpour"
+        ]
+      },
+      {
+        "item": "babiriBerry",
+        "qty": 0,
+        "fromSpecies": [
+          "froslass",
+          "glalie",
+          "snorunt"
+        ]
+      },
+      {
+        "item": "habanBerry",
+        "qty": 0,
+        "fromSpecies": [
+          "gabite",
+          "garchomp",
+          "gible"
+        ]
+      },
+      {
+        "item": "bigNugget",
+        "qty": 0,
+        "fromSpecies": [
+          "garbodor"
+        ]
+      },
+      {
+        "item": "blackGlasses",
+        "qty": 0,
+        "fromSpecies": [
+          "grimer-alola",
+          "krokorok",
+          "krookodile"
+        ]
+      },
+      {
+        "item": "tangaBerry",
+        "qty": 0,
+        "fromSpecies": [
+          "grumpig",
+          "spoink"
+        ]
+      },
+      {
+        "item": "kingsRock",
+        "qty": 0,
+        "fromSpecies": [
+          "hariyama",
+          "hawlucha",
+          "politoed"
+        ]
+      },
+      {
+        "item": "flameOrb",
+        "qty": 0,
+        "fromSpecies": [
+          "heatmor"
+        ]
+      },
+      {
+        "item": "blackBelt",
+        "qty": 0,
+        "fromSpecies": [
+          "heracross",
+          "hitmonchan",
+          "hitmonlee"
+        ]
+      },
+      {
+        "item": "focusBand",
+        "qty": 0,
+        "fromSpecies": [
+          "hitmonchan",
+          "hitmonlee",
+          "machamp"
+        ]
+      },
+      {
+        "item": "sacredAsh",
+        "qty": 0,
+        "fromSpecies": [
+          "ho-oh"
+        ]
+      },
+      {
+        "item": "brightPowder",
+        "qty": 0,
+        "fromSpecies": [
+          "illumise",
+          "volbeat",
+          "wurmple"
+        ]
+      },
+      {
+        "item": "smokeBall",
+        "qty": 0,
+        "fromSpecies": [
+          "koffing",
+          "salandit",
+          "salazzle"
+        ]
+      },
+      {
+        "item": "laggingTail",
+        "qty": 0,
+        "fromSpecies": [
+          "lickilicky",
+          "lickitung",
+          "slowpoke"
+        ]
+      },
+      {
+        "item": "maxRevive",
+        "qty": 0,
+        "fromSpecies": [
+          "linoone"
+        ]
+      },
+      {
+        "item": "magmarizer",
+        "qty": 0,
+        "fromSpecies": [
+          "magby",
+          "magmar",
+          "magmortar"
+        ]
+      },
+      {
+        "item": "payapaBerry",
+        "qty": 0,
+        "fromSpecies": [
+          "mankey",
+          "primeape"
+        ]
+      },
+      {
+        "item": "occaBerry",
+        "qty": 0,
+        "fromSpecies": [
+          "mawile",
+          "pansage",
+          "simisage"
+        ]
+      },
+      {
+        "item": "ironBall",
+        "qty": 0,
+        "fromSpecies": [
+          "mawile"
+        ]
+      },
+      {
+        "item": "quickClaw",
+        "qty": 0,
+        "fromSpecies": [
+          "meowth",
+          "persian",
+          "sandshrew"
+        ]
+      },
+      {
+        "item": "moomooMilk",
+        "qty": 0,
+        "fromSpecies": [
+          "miltank"
+        ]
+      },
+      {
+        "item": "toxicOrb",
+        "qty": 0,
+        "fromSpecies": [
+          "muk"
+        ]
+      },
+      {
+        "item": "powerHerb",
+        "qty": 0,
+        "fromSpecies": [
+          "nuzleaf",
+          "seedot",
+          "shiftry"
+        ]
+      },
+      {
+        "item": "lightBall",
+        "qty": 0,
+        "fromSpecies": [
+          "pikachu"
+        ]
+      },
+      {
+        "item": "gripClaw",
+        "qty": 0,
+        "fromSpecies": [
+          "pinsir",
+          "sandshrew",
+          "sandslash"
+        ]
+      },
+      {
+        "item": "shucaBerry",
+        "qty": 0,
+        "fromSpecies": [
+          "ponyta",
+          "rapidash"
+        ]
+      },
+      {
+        "item": "chilanBerry",
+        "qty": 0,
+        "fromSpecies": [
+          "raticate",
+          "rattata",
+          "rattata-alola"
+        ]
+      },
+      {
+        "item": "greenShard",
+        "qty": 0,
+        "fromSpecies": [
+          "relicanth"
+        ]
+      },
+      {
+        "item": "wideLens",
+        "qty": 0,
+        "fromSpecies": [
+          "sableye",
+          "yanma",
+          "yanmega"
+        ]
+      },
+      {
+        "item": "expertBelt",
+        "qty": 0,
+        "fromSpecies": [
+          "sawk",
+          "throh"
+        ]
+      },
+      {
+        "item": "berryJuice",
+        "qty": 0,
+        "fromSpecies": [
+          "shuckle"
+        ]
+      },
+      {
+        "item": "snowball",
+        "qty": 0,
+        "fromSpecies": [
+          "snorunt"
+        ]
+      },
+      {
+        "item": "sunStone",
+        "qty": 0,
+        "fromSpecies": [
+          "solrock",
+          "sunflora"
+        ]
+      },
+      {
+        "item": "cobaBerry",
+        "qty": 0,
+        "fromSpecies": [
+          "sunkern"
+        ]
+      },
+      {
+        "item": "chartiBerry",
+        "qty": 0,
+        "fromSpecies": [
+          "swellow",
+          "taillow"
+        ]
+      },
+      {
+        "item": "electricSeed",
+        "qty": 0,
+        "fromSpecies": [
+          "togedemaru"
+        ]
+      },
+      {
+        "item": "shinyStone",
+        "qty": 0,
+        "fromSpecies": [
+          "togepi"
+        ]
+      },
+      {
+        "item": "revive",
+        "qty": 0,
+        "fromSpecies": [
+          "zigzagoon"
+        ]
+      }
+    ],
+    "totalDropItems": 121
+  },
+  "inventory": {
+    "prettyWing": 16,
+    "nugget": 14,
+    "oranBerry": 13,
+    "rawstBerry": 7,
+    "persimBerry": 7,
+    "potion": 6,
+    "sitrusBerry": 6,
+    "pechaBerry": 6,
+    "pokeBall": 5,
+    "spellTag": 5,
+    "charcoal": 5,
+    "aspearBerry": 4,
+    "tinyMushroom": 3,
+    "ovalStone": 3,
+    "everstone": 3,
+    "starPiece": 3,
+    "stardust": 3,
+    "lumBerry": 2,
+    "pearl": 2,
+    "bigRoot": 2,
+    "cheriBerry": 2,
+    "mentalHerb": 2,
+    "chestoBerry": 2,
+    "bigMushroom": 2,
+    "lifeOrb": 1,
+    "lightClay": 1,
+    "shedShell": 1,
+    "luckyEgg": 1,
+    "luckyPunch": 1,
+    "leppaBerry": 1,
+    "luminousMoss": 1,
+    "neverMeltIce": 1,
+    "metalPowder": 1,
+    "quickPowder": 1,
+    "silkScarf": 1,
+    "mysticWater": 1,
+    "razorClaw": 1,
+    "heartScale": 1,
+    "magnet": 1,
+    "leftovers": 1,
+    "upGrade": 1,
+    "deepSeaScale": 1,
+    "dragonScale": 1,
+    "yacheBerry": 1,
+    "honey": 1,
+    "grassySeed": 1
+  },
+  "browserErrors": []
+}

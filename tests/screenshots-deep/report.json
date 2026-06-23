@@ -1,0 +1,390 @@
+{
+  "date": "2026-06-02T19:41:53.456Z",
+  "passed": 76,
+  "failed": 0,
+  "consoleErrors": 0,
+  "consoleWarnings": 0,
+  "tests": [
+    {
+      "name": "HP formula produces correct values",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "name": "Non-HP stat formula produces correct values",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "name": "IV range validation — wild 0-31, player 0-70",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "name": "EV total cap 510, per-stat cap 252",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "name": "Stage modifiers clamp at ±6, each stage = ±50%",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "name": "Nature modifier values are correct (x1.1 / x0.9)",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "name": "Capture rate formula",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "name": "Status capture bonus — sleep 2.5x, para 1.5x",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "name": "Ball multipliers are correct",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "name": "Quick Ball first-turn bonus is x5",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "name": "Escape formula: success when F > 255",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "name": "Hold items multipliers exist",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "name": "Weather multipliers — Rain: water x1.5, fire x0.5",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "name": "Total EV from battle is capped per KO",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "name": "EXP Share distributes 50% to all living team members",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "name": "Evolution level-up trigger math",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "name": "All evolution stone item IDs exist",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "name": "Special evolution items exist",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "name": "Evolution animation stages count",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "name": "Level-up moves checked between lastCheckLevel and newLevel",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "name": "Backpack total limit is 1000 (excluding credit)",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "name": "Per-category limits exist and are positive",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "name": "Item prices are positive",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "name": "Candy pricing correct",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "name": "Train/Weaken pricing correct",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "name": "Crafting has 13 recipes across 7 categories",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "name": "Item sell returns half price",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "name": "Daycare level-up: +1 level/hour, cap at 100",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "name": "Egg chance: 30% after 2h, ready in 30min",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "name": "Daycare check interval is 60s",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "name": "Breeding: opposite genders + same egg group (or Ditto)",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "name": "IV inheritance: average of parents ±2, clamped 0-31",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "name": "Egg time: 10min base, 5min if same nature",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "name": "Hatch time: 3-8 days random",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "name": "Hatched pokemon: Lv1, IV from egg, random nature, 50/50 gender",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "name": "Hatched pokemon gets happiness 120",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "name": "Daily quest count is 3 per day",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "name": "Daily quest types (catch_x, defeat_x, earn_money, explore, use_item, collect_items)",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "name": "Achievement count is 14",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "name": "Quest rewards are items (not money-only)",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "name": "NPC quests have targetItem, targetQty, rewardMoney, rewardItem",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "name": "Trade cooldown is 3 seconds",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "name": "Trade requires socket events: request → accept → offer → confirm → execute",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "name": "Trade surrender: 500 coins to winner",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "name": "PvP damage formula is correct",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "name": "PvP crit chance ~6.25%, crit multiplier x1.5",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "name": "PvP surrender cost is 500 coins",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "name": "ELO: K=32, starting at 1000",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "name": "Money validation: 0-1B",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "name": "Server economy operations (buy/sell/craft/reward) use save lock",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "name": "Sell returns floor(price/2)",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "name": "Economy reward cap is 1M",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "name": "Cloud save rate limit 30/min, debounce 2s",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "name": "Cloud save retry: 3 attempts (5s, 15s, 30s)",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "name": "Save has rotation: save → save_bak1 → save_bak2",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "name": "Save key format: league17_{name}_{trainerId}",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "name": "State hydration: fills missing UIDs, stat stages, berries",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "name": "Corruption recovery: tries save → bak1 → bak2",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "name": "Save versioning: server rejects outdated saves",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "name": "Money validation on save: 0-1B",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "name": "Team validation: max 6, each has apiData.name, currentHp>=0, maxHp 1-9999, level 1-100",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "name": "IV validation: 0-31 (or 0-70 for players)",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "name": "Stat stage validation: -6 to +6",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "name": "Regions count: 5 (Kanto, East Johto, West Johto, Selene, S.Archipelago)",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "name": "Transport prices exist and are reasonable",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "name": "Special access items: waterSupply (30k), skiGear (100k)",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "name": "Speedboat: 500k + 500 popularity",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "name": "All artifacts have defined effects",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "name": "Chat limits: 5 msg/min, 500 chars max",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "name": "Chat dedup via data-msg-id",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "name": "Chat polling fallback every 30s",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "name": "Pokedex status flow: unknown → seen → caught",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "name": "Pokedex filters: generation (1-4), status, text",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "name": "Auto-hunt timer: 2-5s",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "name": "Auto-hunt encounter chance: 20%",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "name": "Graphite Bell: x3 weight for rare encounters (weight ≤ 0.3)",
+      "status": "PASS",
+      "detail": ""
+    }
+  ],
+  "details": []
+}

@@ -5,32 +5,59 @@ import { generateToken, authMiddleware } from '../middleware/auth.js';
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import crypto from 'crypto';
+import { asyncHandler, AppError } from '../lib/errors.js';
+import { logger } from '../lib/logger.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const AVATARS_DIR = path.join(__dirname, '../../public/avatars');
 
+// Admin access config from env vars (shared with admin.js)
+const ADMIN_IDS = (process.env.ADMIN_IDS || '1394113078').split(',').map(Number).filter(n => !isNaN(n));
+const ADMIN_USERNAMES = (process.env.ADMIN_USERNAMES || 'nineinchkn5atmythroat').split(',');
+
+// Refresh token helpers
+function generateRefreshToken() {
+  return crypto.randomBytes(40).toString('hex');
+}
+
+const ACCESS_TOKEN_EXPIRY = '15m';
+const REFRESH_TOKEN_EXPIRY_DAYS = 7;
+
+async function issueRefreshToken(db, userId) {
+  const token = generateRefreshToken();
+  const expiresAt = new Date(Date.now() + REFRESH_TOKEN_EXPIRY_DAYS * 86400000).toISOString();
+  await db.run('INSERT INTO refresh_tokens (user_id, token, expires_at) VALUES (?, ?, ?)', userId, token, expiresAt);
+  return token;
+}
+
 const router = Router();
 
-router.post('/tg', async (req, res) => {
-  try {
+router.post('/tg', asyncHandler(async (req, res) => {
     const { initData } = req.body;
     const botToken = process.env.BOT_TOKEN;
+    const isProduction = process.env.NODE_ENV === 'production';
     const isRealInitData = initData && initData !== 'test';
     let tgUser;
 
     // Custom test user via JSON initData (for multi-trainer Playwright testing)
-    if (initData && initData.startsWith('{')) {
+    if (initData && initData.startsWith('{') && !isProduction) {
       tgUser = parseTestUser(initData);
     } else if (!isRealInitData) {
-      // Browser/dev access — use test user, no BOT_TOKEN needed
-      if (initData === 'test') {
+      if (initData === 'test' && !isProduction) {
+        // Dev mode: bypass Telegram auth
         tgUser = parseTestUser();
+      } else if (isProduction) {
+        return res.status(403).json({ error: 'Telegram authentication required in production' });
       } else {
         return res.status(403).json({ error: 'Telegram authentication required' });
       }
     } else if (!botToken) {
-      console.warn('BOT_TOKEN is not set — Telegram init data verification is SKIPPED. Set BOT_TOKEN in production!');
+      if (isProduction) {
+        return res.status(500).json({ error: 'BOT_TOKEN not configured' });
+      }
+      logger.warn('BOT_TOKEN is not set — Telegram init data verification is SKIPPED. Set BOT_TOKEN in production!');
       tgUser = parseTestUser(initData);
     } else {
       tgUser = verifyTelegramInitData(initData, botToken);
@@ -66,23 +93,44 @@ router.post('/tg', async (req, res) => {
     }
 
     const token = generateToken(user.id, telegramId);
+    const refreshToken = await issueRefreshToken(db, user.id);
 
     res.json({
       token,
+      refreshToken,
       user: {
         id: user.id, telegram_id: user.telegram_id, username: user.username,
         registered: user.registered || 0, nickname: user.nickname || '',
         avatar: user.avatar || '👤', starter_pokemon: user.starter_pokemon || ''
       }
     });
-  } catch (err) {
-    console.error('Auth error:', err);
-    res.status(500).json({ error: 'Internal server error' });
-  }
-});
+}));
 
-router.post('/register', authMiddleware, async (req, res) => {
-  try {
+// POST /api/auth/refresh — exchange a refresh token for a new access+refresh token pair
+router.post('/refresh', asyncHandler(async (req, res) => {
+  const { refreshToken } = req.body;
+  if (!refreshToken) return res.status(400).json({ error: 'Refresh token required' });
+
+  const db = getDB();
+  const row = await db.get(
+    "SELECT * FROM refresh_tokens WHERE token = ? AND expires_at > datetime('now')",
+    refreshToken
+  );
+  if (!row) return res.status(401).json({ error: 'Invalid or expired refresh token' });
+
+  // Delete used token (rotation)
+  await db.run('DELETE FROM refresh_tokens WHERE id = ?', row.id);
+
+  const user = await db.get('SELECT id, telegram_id FROM users WHERE id = ?', row.user_id);
+  if (!user) return res.status(401).json({ error: 'User not found' });
+
+  const token = generateToken(user.id, user.telegram_id);
+  const newRefreshToken = await issueRefreshToken(db, user.id);
+
+  res.json({ token, refreshToken: newRefreshToken });
+}));
+
+router.post('/register', authMiddleware, asyncHandler(async (req, res) => {
     const { nickname, avatar, starterPokemon } = req.body;
     const db = getDB();
     const user = await db.get('SELECT * FROM users WHERE id = ?', req.userId);
@@ -106,14 +154,16 @@ router.post('/register', authMiddleware, async (req, res) => {
 
     const updated = await db.get('SELECT * FROM users WHERE id = ?', req.userId);
     res.json({ success: true, user: updated });
-  } catch (err) {
-    console.error('Register error:', err);
-    res.status(500).json({ error: 'Internal server error' });
-  }
-});
+}));
 
-router.post('/avatar', authMiddleware, async (req, res) => {
-  try {
+router.get('/is-admin', authMiddleware, asyncHandler(async (req, res) => {
+    const db = getDB();
+    const user = await db.get('SELECT username FROM users WHERE id = ?', req.userId);
+    const isAdmin = user && (ADMIN_IDS.includes(Number(req.userId)) || ADMIN_USERNAMES.includes(user.username));
+    res.json({ isAdmin: !!isAdmin });
+}));
+
+router.post('/avatar', authMiddleware, asyncHandler(async (req, res) => {
     const { image } = req.body;
     if (!image || !image.startsWith('data:image/')) {
       return res.status(400).json({ error: 'No valid image provided' });
@@ -135,10 +185,15 @@ router.post('/avatar', authMiddleware, async (req, res) => {
     await db.run('UPDATE users SET avatar = ? WHERE id = ?', avatarUrl, req.userId);
 
     res.json({ success: true, avatarUrl });
-  } catch (err) {
-    console.error('Avatar upload error:', err);
-    res.status(500).json({ error: 'Upload failed' });
+}));
+
+// POST /api/auth/logout — invalidate refresh token
+router.post('/logout', authMiddleware, asyncHandler(async (req, res) => {
+  const { refreshToken } = req.body;
+  if (refreshToken) {
+    await getDB().run('DELETE FROM refresh_tokens WHERE token = ?', refreshToken);
   }
-});
+  res.json({ success: true });
+}));
 
 export default router;

@@ -1,4 +1,8 @@
 import { Server } from 'socket.io';
+import { initBattleSocket, removePlayerFromQueue, handlePvpDisconnect } from './routes/battle.js';
+import { initTradeSocket, cleanupTradeOnDisconnect } from './routes/trade.js';
+import { verifyToken } from './middleware/auth.js';
+import { logger } from './lib/logger.js';
 
 let io;
 const onlinePlayers = new Map(); // socket.id -> { username, userId }
@@ -7,6 +11,8 @@ const activeTrades = new Map();  // tradeId -> { p1, p2, p1Offers[], p2Offers[],
 const pvpBattles = new Map();   // battleId -> { p1, p2 }
 
 export function getIO() { return io; }
+export function getOnlinePlayers() { return onlinePlayers; }
+export function getUserSockets() { return userSockets; }
 
 export function notifyUser(userId, event, data) {
   const sockets = userSockets.get(String(userId));
@@ -29,18 +35,45 @@ export function initSocket(server, allowedOrigin) {
   });
 
   io.on('connection', (socket) => {
-    console.log('User connected:', socket.id);
+    logger.info('User connected: %s', socket.id);
 
     // Handle socket errors gracefully
     socket.on('error', (err) => {
-      console.error(`Socket error (${socket.id}):`, err.message || err);
+      logger.error('Socket error (%s): %s', socket.id, err.message || err);
     });
+
+    // JWT auth for socket connections
+    const token = socket.handshake.auth?.token || socket.handshake.query?.token;
+    if (!token) {
+      socket.emit('error', { message: 'Authentication required' });
+      socket.disconnect();
+      return;
+    }
+
+    try {
+      const decoded = verifyToken(token);
+      if (!decoded || !decoded.userId) {
+        socket.emit('error', { message: 'Invalid token' });
+        socket.disconnect();
+        return;
+      }
+      socket.userId = String(decoded.userId);
+      socket.username = decoded.telegramId || 'User';
+    } catch (err) {
+      logger.warn('Socket auth failed:', err.message);
+      socket.emit('error', { message: 'Authentication failed' });
+      socket.disconnect();
+      return;
+    }
 
     // Player joins the global lobby
     socket.on('join_lobby', (data) => {
       if (!data || !data.username) return;
-      onlinePlayers.set(socket.id, { username: data.username, userId: data.userId });
-      const uid = String(data.userId);
+      // Server-authoritative: use userId from JWT auth, not client payload
+      const uid = socket.userId;
+      const uname = data.username;
+      socket.username = uname;
+      onlinePlayers.set(socket.id, { username: uname, userId: uid });
       if (!userSockets.has(uid)) userSockets.set(uid, new Set());
       userSockets.get(uid).add(socket.id);
       io.emit('online_players', Array.from(onlinePlayers.entries()).map(([id, info]) => ({ id, ...info })));
@@ -164,9 +197,16 @@ export function initSocket(server, allowedOrigin) {
       io.to(fromId).emit('pvp_declined', { fromName: onlinePlayers.get(socket.id)?.username });
     });
 
+    // === Week 9: Enhanced Battle & Trade Systems ===
+    initBattleSocket(io, socket);
+    initTradeSocket(io, socket, userSockets);
+
     socket.on('disconnect', (reason) => {
-      console.log('User disconnected:', socket.id, `(${reason})`);
+      logger.info('User disconnected: %s (%s)', socket.id, reason);
+      socket.removeAllListeners();
       const info = onlinePlayers.get(socket.id);
+      delete socket.userId;
+      delete socket.username;
       if (info) {
         const uid = String(info.userId);
         const sockets = userSockets.get(uid);
@@ -175,7 +215,7 @@ export function initSocket(server, allowedOrigin) {
       onlinePlayers.delete(socket.id);
       io.emit('online_players', Array.from(onlinePlayers.entries()).map(([id, info]) => ({ id, ...info })));
 
-      // Cleanup trades
+      // Cleanup trades (legacy)
       for (const [tradeId, trade] of activeTrades.entries()) {
         if (trade.p1 === socket.id || trade.p2 === socket.id) {
           const partner = trade.p1 === socket.id ? trade.p2 : trade.p1;
@@ -184,7 +224,7 @@ export function initSocket(server, allowedOrigin) {
         }
       }
 
-      // Cleanup PvP battles
+      // Cleanup PvP battles (legacy)
       for (const [battleId, battle] of pvpBattles.entries()) {
         if (battle.p1 === socket.id || battle.p2 === socket.id) {
           const opponent = battle.p1 === socket.id ? battle.p2 : battle.p1;
@@ -192,6 +232,13 @@ export function initSocket(server, allowedOrigin) {
           pvpBattles.delete(battleId);
         }
       }
+
+      // Cleanup Week 9 battle queue and matches
+      removePlayerFromQueue(socket.id);
+      handlePvpDisconnect(io, socket.id);
+
+      // Cleanup Week 9 trades
+      cleanupTradeOnDisconnect(io, socket.id);
     });
   });
 }

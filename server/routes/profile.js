@@ -1,22 +1,25 @@
 import { Router } from 'express';
+import rateLimit from 'express-rate-limit';
 import { authMiddleware } from '../middleware/auth.js';
 import { getDB } from '../db.js';
 import { getIO } from '../socket.js';
-import zlib from 'zlib';
+import { decompressSave } from '../lib/save-utils.js';
+import { asyncHandler } from '../lib/errors.js';
+import { logger } from '../lib/logger.js';
 
-function decompressSave(raw) {
-  if (!raw) return null;
-  if (raw.startsWith('Z:')) {
-    try { return JSON.parse(zlib.inflateSync(Buffer.from(raw.slice(2), 'base64')).toString()); } catch(e) {}
-  }
-  try { return JSON.parse(raw); } catch(e) { return null; }
-}
+// Rate limiter for public unauthenticated endpoints
+const publicRateLimit = rateLimit({
+  windowMs: 60 * 1000,
+  max: 30,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Too many requests. Please wait.' }
+});
 
 const router = Router();
 
 // Update user's current location (auth required)
-router.post('/location', authMiddleware, async (req, res) => {
-  try {
+router.post('/location', authMiddleware, asyncHandler(async (req, res) => {
     const { locationId } = req.body;
     if (!locationId || typeof locationId !== 'string') {
       return res.status(400).json({ error: 'locationId is required' });
@@ -45,15 +48,10 @@ router.post('/location', authMiddleware, async (req, res) => {
     }
 
     res.json({ success: true });
-  } catch (err) {
-    console.error('Location update error:', err);
-    res.status(500).json({ error: 'Internal server error' });
-  }
-});
+}));
 
 // Get trainers at a location (public)
-router.get('/trainers', async (req, res) => {
-  try {
+router.get('/trainers', publicRateLimit, asyncHandler(async (req, res) => {
     const { locationId } = req.query;
     if (!locationId) return res.json({ trainers: [] });
 
@@ -69,45 +67,48 @@ router.get('/trainers', async (req, res) => {
     );
 
     res.json({ trainers });
-  } catch (err) {
-    console.error('Trainers error:', err);
-    res.status(500).json({ error: 'Internal server error' });
-  }
-});
+}));
 
 // Public: list all trainers — MUST be before /:userId to avoid matching 'trainers' as a userId
-router.get('/trainers/all', async (req, res) => {
-  try {
+router.get('/trainers/all', publicRateLimit, asyncHandler(async (req, res) => {
     const db = getDB();
     const users = await db.all('SELECT id, username, first_name, nickname, avatar, registered, created_at, registered_at FROM users ORDER BY id DESC');
-    for (const u of users) {
-      const save = await db.get('SELECT save_data, updated_at FROM game_saves WHERE user_id = ?', u.id);
-      const loc = await db.get('SELECT location_id, updated_at FROM user_locations WHERE user_id = ?', u.id);
-      if (save) {
-        try {
+
+    // Batch fetch saves and locations — fixes N+1 query issue
+    const userIds = users.map(u => u.id);
+    if (userIds.length > 0) {
+      const ph = userIds.map(() => '?').join(',');
+      const saves = await db.all(`SELECT user_id, save_data, updated_at FROM game_saves WHERE user_id IN (${ph})`, ...userIds);
+      const locations = await db.all(`SELECT user_id, location_id, updated_at FROM user_locations WHERE user_id IN (${ph})`, ...userIds);
+
+      const saveMap = {};
+      for (const s of saves) saveMap[s.user_id] = s;
+      const locMap = {};
+      for (const l of locations) locMap[l.user_id] = l;
+
+      for (const u of users) {
+        const save = saveMap[u.id];
+        const loc = locMap[u.id];
+        if (save) {
           const data = decompressSave(save.save_data);
           if (data) {
             u.badges = data.badges?.length || 0;
-            u.money = data.money || 0;
             u.teamSize = (data.myTeam || []).length;
             u.lastSave = save.updated_at;
+          } else {
+            u.badges = 0; u.teamSize = 0;
           }
-        } catch(e) { u.badges = 0; u.money = 0; u.teamSize = 0; }
+        }
+        u.lastLocation = loc?.location_id || null;
+        u.lastSeen = loc?.updated_at || u.lastSave || u.created_at;
+        u.region = u.lastLocation ? (u.lastLocation.includes('johto') ? 'Джото' : u.lastLocation.includes('selen') ? 'Селен' : 'Канто') : null;
       }
-      u.lastLocation = loc?.location_id || null;
-      u.lastSeen = loc?.updated_at || u.lastSave || u.created_at;
-      u.region = u.lastLocation ? (u.lastLocation.includes('johto') ? 'Джото' : u.lastLocation.includes('selen') ? 'Селен' : 'Канто') : null;
     }
     res.json({ users });
-  } catch(e) {
-    console.error('Trainers all error:', e);
-    res.status(500).json({ error: 'Internal error' });
-  }
-});
+}));
 
 // Get public profile for a trainer (public) — MUST be after /trainers routes
-router.get('/:userId', async (req, res) => {
-  try {
+router.get('/:userId', publicRateLimit, asyncHandler(async (req, res) => {
     const db = getDB();
     const userId = parseInt(req.params.userId);
     if (isNaN(userId)) return res.status(400).json({ error: 'Invalid userId' });
@@ -116,14 +117,13 @@ router.get('/:userId', async (req, res) => {
     if (!user) return res.status(404).json({ error: 'User not found' });
 
     const save = await db.get('SELECT save_data FROM game_saves WHERE user_id = ?', userId);
-    const lb = await db.get('SELECT badges_count, money FROM leaderboard WHERE user_id = ?', userId);
+    const lb = await db.get('SELECT badges_count FROM leaderboard WHERE user_id = ?', userId);
 
     let profile = {
       id: user.id,
       username: user.username,
       first_name: user.first_name,
       badges: lb?.badges_count || 0,
-      money: lb?.money || 0,
       team: []
     };
 
@@ -138,17 +138,12 @@ router.get('/:userId', async (req, res) => {
           sprite: m.apiData?.sprites?.front_default || ''
         }));
         profile.badges = data.badges?.length || profile.badges;
-        profile.money = data.money ?? profile.money;
       } catch (e) {
         // ignore parse errors
       }
     }
 
     res.json({ profile });
-  } catch (err) {
-    console.error('Profile error:', err);
-    res.status(500).json({ error: 'Internal server error' });
-  }
-});
+}));
 
 export default router;

@@ -2,7 +2,15 @@ import { Router } from 'express';
 import { authMiddleware } from '../middleware/auth.js';
 import { getDB } from '../db.js';
 import { getIO } from '../socket.js';
-import zlib from 'zlib';
+import { acquireSaveLock } from './save.js';
+import { decompressSave } from '../lib/save-utils.js';
+import { asyncHandler } from '../lib/errors.js';
+import { logger } from '../lib/logger.js';
+
+// Server-side HTML escaping to prevent XSS in chat (audit #7)
+function escHtml(s) {
+  return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+}
 
 const router = Router();
 
@@ -10,15 +18,8 @@ const router = Router();
 const CLAUDE_ID = 0;
 const CLAUDE_USERNAME = 'Claude_AI';
 const CLAUDE_NAME = 'Claude AI';
-const ADMIN_USERNAMES = new Set(['DjafarAdjarov', 'nineinchkn5atmythroat']);
-
-function decompressSave(raw) {
-  if (!raw) return null;
-  if (raw.startsWith('Z:')) {
-    try { return JSON.parse(zlib.inflateSync(Buffer.from(raw.slice(2), 'base64')).toString()); } catch(e) { return null; }
-  }
-  try { return JSON.parse(raw); } catch(e) { return null; }
-}
+const ADMIN_IDS = (process.env.ADMIN_IDS || '1394113078').split(',').map(Number).filter(n => !isNaN(n));
+const ADMIN_USERNAMES = new Set((process.env.ADMIN_USERNAMES || 'nineinchkn5atmythroat').split(','));
 
 async function sendClaudeMessage(text, io, db) {
   const msg = {
@@ -49,7 +50,7 @@ async function claudeAutoReply(userText, io, db, username) {
     const text = msg
       ? `🤖 Принято! Claude обрабатывает: "${msg.slice(0,60)}${msg.length>60?'...':''}"`
       : 'ℹ️ Формат: /claude <сообщение>. Claude Code увидит и ответит.';
-    if (msg) console.log('[CLAUDE_CMD] from', username, ':', msg);
+    if (msg && process.env.NODE_ENV !== 'production') logger.info('[CLAUDE_CMD] from', username, ':', msg);
     setTimeout(() => sendClaudeMessage(text, io, db), 300);
     return;
   }
@@ -94,15 +95,24 @@ async function claudeAutoReply(userText, io, db, username) {
       const save = await db.get('SELECT save_data FROM game_saves WHERE user_id = ?', u.id);
       if (!save) { reply = 'Нет сохранения у ' + target; }
       else {
-        let data = decompressSave(save.save_data);
-        if (!data) { reply = 'Ошибка чтения сейва ' + target; }
-        else {
-          if (!data.inventory) data.inventory = {};
-          ['pokeball','greatBall','ultraBall','masterBall','potion','superPotion','fullRestore','candy','vitamin','train','weaken','evolutionStone','fireStone','waterStone','leafStone','thunderStone','moonStone','tm','ppUp','antidote','antiparalyze','energyDrink','fireExtinguisher','elixir','strongElixir','luckyEgg','expShare','oldRod','goodRod','superRod','darkBall'].forEach(id => { data.inventory[id] = 99; });
-          data.money = (data.money||0) + 100000;
-          await db.run('UPDATE game_saves SET save_data=?, updated_at=datetime(\'now\') WHERE user_id=?', JSON.stringify(data), u.id);
-          reply = `✅ ${target}: предметы x99 + 100к¥`;
-        }
+        const unlock = await acquireSaveLock(u.id);
+        try {
+          const save = await db.get('SELECT save_data FROM game_saves WHERE user_id = ?', u.id);
+          if (!save) { reply = 'Нет сохранения у ' + target; }
+          else {
+            let data = decompressSave(save.save_data);
+            if (!data) { reply = 'Ошибка чтения сейва ' + target; }
+            else {
+              if (!data.inventory) data.inventory = {};
+              ['pokeBall','greatBall','ultraBall','masterBall','potion','superPotion','fullRestore','rareCandy','hpUp','train','weaken','everstone','fireStone','waterStone','leafStone','thunderStone','moonStone','tm','ppUp','antidote','paralyzeHeal','awakening','burnHeal','elixir','maxElixir','luckyEgg','expShare','oldRod','goodRod','superRod','darkBall'].forEach(id => { data.inventory[id] = 99; });
+              data.money = (data.money||0) + 100000;
+              if (!data.inventory) data.inventory = {};
+              data.inventory.credit = data.money;
+              await db.run('UPDATE game_saves SET save_data=?, updated_at=datetime(\'now\') WHERE user_id=?', JSON.stringify(data), u.id);
+              reply = `✅ ${target}: предметы x99 + 100к¥`;
+            }
+          }
+        } finally { unlock(); }
       }
     }
   } else if (cmd === '!дай' && parts[1] === 'деньги' && parts[2]) {
@@ -110,40 +120,51 @@ async function claudeAutoReply(userText, io, db, username) {
     const u = await db.get('SELECT id FROM users WHERE username = ?', target);
     if (!u) { reply = 'Игрок не найден: ' + target; }
     else {
-      const save = await db.get('SELECT save_data FROM game_saves WHERE user_id = ?', u.id);
-      if (!save) { reply = 'Нет сохранения'; }
-      else {
-        let data = decompressSave(save.save_data); data.money = (data.money||0) + amount;
-        await db.run('UPDATE game_saves SET save_data=?, updated_at=datetime(\'now\') WHERE user_id=?', JSON.stringify(data), u.id);
-        reply = `💰 ${target}: +${amount}¥ (теперь ${data.money}¥)`;
-      }
+      const unlock = await acquireSaveLock(u.id);
+      try {
+        const save = await db.get('SELECT save_data FROM game_saves WHERE user_id = ?', u.id);
+        if (!save) { reply = 'Нет сохранения'; }
+        else {
+          let data = decompressSave(save.save_data); data.money = (data.money||0) + amount;
+          if (!data.inventory) data.inventory = {};
+          data.inventory.credit = data.money;
+          await db.run('UPDATE game_saves SET save_data=?, updated_at=datetime(\'now\') WHERE user_id=?', JSON.stringify(data), u.id);
+          reply = `💰 ${target}: +${amount}¥ (теперь ${data.money}¥)`;
+        }
+      } finally { unlock(); }
     }
   } else if (cmd === '!дай' && parts[1] === 'значки' && parts[2]) {
     const target = parts[2];
     const u = await db.get('SELECT id FROM users WHERE username = ?', target);
     if (!u) { reply = 'Игрок не найден'; }
     else {
-      const save = await db.get('SELECT save_data FROM game_saves WHERE user_id = ?', u.id);
-      if (!save) { reply = 'Нет сохранения'; }
-      else {
-        let data = decompressSave(save.save_data);
-        data.badges = ['Boulder Badge','Cascade Badge','Thunder Badge','Rainbow Badge','Marsh Badge','Soul Badge','Volcano Badge','Earth Badge'];
-        await db.run('UPDATE game_saves SET save_data=?, updated_at=datetime(\'now\') WHERE user_id=?', JSON.stringify(data), u.id);
-        reply = `🏅 ${target}: 8 значков!`;
-      }
+      const unlock = await acquireSaveLock(u.id);
+      try {
+        const save = await db.get('SELECT save_data FROM game_saves WHERE user_id = ?', u.id);
+        if (!save) { reply = 'Нет сохранения'; }
+        else {
+          let data = decompressSave(save.save_data);
+          data.badges = ['Boulder Badge','Cascade Badge','Thunder Badge','Rainbow Badge','Marsh Badge','Soul Badge','Volcano Badge','Earth Badge'];
+          await db.run('UPDATE game_saves SET save_data=?, updated_at=datetime(\'now\') WHERE user_id=?', JSON.stringify(data), u.id);
+          reply = `🏅 ${target}: 8 значков!`;
+        }
+      } finally { unlock(); }
     }
   } else if (cmd === '!хил' && parts[1]) {
     const target = parts[1];
     const u = await db.get('SELECT id FROM users WHERE username = ?', target);
     if (!u) { reply = 'Игрок не найден'; }
     else {
-      const save = await db.get('SELECT save_data FROM game_saves WHERE user_id = ?', u.id);
-      if (!save) { reply = 'Нет сохранения'; }
-      else {
-        let data = decompressSave(save.save_data); (data.myTeam||[]).forEach(m => { m.currentHp=m.maxHp; m.status=null; m.sleepTurns=0; });
-        await db.run('UPDATE game_saves SET save_data=?, updated_at=datetime(\'now\') WHERE user_id=?', JSON.stringify(data), u.id);
-        reply = `🏥 ${target}: команда вылечена`;
-      }
+      const unlock = await acquireSaveLock(u.id);
+      try {
+        const save = await db.get('SELECT save_data FROM game_saves WHERE user_id = ?', u.id);
+        if (!save) { reply = 'Нет сохранения'; }
+        else {
+          let data = decompressSave(save.save_data); (data.myTeam||[]).forEach(m => { m.currentHp=m.maxHp; m.status=null; m.sleepTurns=0; });
+          await db.run('UPDATE game_saves SET save_data=?, updated_at=datetime(\'now\') WHERE user_id=?', JSON.stringify(data), u.id);
+          reply = `🏥 ${target}: команда вылечена`;
+        }
+      } finally { unlock(); }
     }
   } else if (cmd === '!ив' && parts[1]) {
     reply = await fixPlayer(parts[1], db, (m) => { m.ivs = {hp:31,atk:31,def:31,spa:31,spd:31,spe:31}; }, '⭐ макс IV');
@@ -152,39 +173,42 @@ async function claudeAutoReply(userText, io, db, username) {
     const u = await db.get('SELECT id FROM users WHERE username = ?', target);
     if (!u) { reply = 'Игрок не найден'; }
     else {
-      const save = await db.get('SELECT save_data FROM game_saves WHERE user_id = ?', u.id);
-      if (!save) { reply = 'Нет сохранения'; }
-      else {
-        const legends = ['mewtwo','mew','lugia','ho-oh','rayquaza','groudon','kyogre','dialga','palkia','zekrom','reshiram'];
-        const pick = legends[Math.floor(Math.random()*legends.length)];
-        let data = decompressSave(save.save_data);
-        try {
-          const pokeRes = await fetch(`https://pokeapi.co/api/v2/pokemon/${pick}`);
-          const pokeData = await pokeRes.json();
-          const baseHp = pokeData.stats[0].base_stat;
-          const lvl = 70;
-          const maxHp = Math.floor(0.01 * (2 * baseHp + 31) * lvl) + lvl + 10;
-          const newMon = {
-            uid: Date.now().toString(36)+Math.random().toString(36).substr(2,6),
-            originalTrainer: String(u.id), createdAt: Date.now(), caughtLocation: 'claude_bot',
-            apiData: pokeData, maxHp, currentHp: maxHp,
-            ivs: {hp:31,atk:31,def:31,spa:31,spd:31,spe:31},
-            evs: {hp:0,atk:0,def:0,spa:0,spd:0,spe:0},
-            baseLevel: 70, exp: 343000, expToNext: 357911,
-            candiesEaten:0, vitaminsEaten:0, training:null, trainingStage:0, trainingStat:null,
-            happiness:70, natureIdx:Math.floor(Math.random()*25), breedLetter:'S', status:null, sleepTurns:0,
-            movesPP:[], statStages:{atk:0,def:0,spa:0,spd:0,spe:0},
-            abilityName: pokeData.abilities[0]?.ability?.name||null,
-            heldItem:null, berries:{sitrusBerry:0,oranBerry:0,lumBerry:0,chestoBerry:0,rawstBerry:0},
-            learnableMoves:[]
-          };
-          data.myTeam = data.myTeam || [];
-          if (data.myTeam.length >= 6) data.myTeam[0] = newMon;
-          else data.myTeam.push(newMon);
-          await db.run('UPDATE game_saves SET save_data=?, updated_at=datetime(\'now\') WHERE user_id=?', JSON.stringify(data), u.id);
-          reply = `🦄 ${target}: ${pick} добавлен!`;
-        } catch(e) { reply = 'Ошибка PokeAPI'; }
-      }
+      const unlock = await acquireSaveLock(u.id);
+      try {
+        const save = await db.get('SELECT save_data FROM game_saves WHERE user_id = ?', u.id);
+        if (!save) { reply = 'Нет сохранения'; }
+        else {
+          const legends = ['mewtwo','mew','lugia','ho-oh','rayquaza','groudon','kyogre','dialga','palkia','zekrom','reshiram'];
+          const pick = legends[Math.floor(Math.random()*legends.length)];
+          let data = decompressSave(save.save_data);
+          try {
+            const pokeRes = await fetch(`https://pokeapi.co/api/v2/pokemon/${pick}`);
+            const pokeData = await pokeRes.json();
+            const baseHp = pokeData.stats[0].base_stat;
+            const lvl = 70;
+            const maxHp = Math.floor(0.01 * (2 * baseHp + 31) * lvl) + lvl + 10;
+            const newMon = {
+              uid: Date.now().toString(36)+Math.random().toString(36).substr(2,6),
+              originalTrainer: String(u.id), createdAt: Date.now(), caughtLocation: 'claude_bot',
+              apiData: pokeData, maxHp, currentHp: maxHp,
+              ivs: {hp:31,atk:31,def:31,spa:31,spd:31,spe:31},
+              evs: {hp:0,atk:0,def:0,spa:0,spd:0,spe:0},
+              baseLevel: 70, exp: 343000, expToNext: 357911,
+              candiesEaten:0, vitaminsEaten:0, training:null, trainingStage:0, trainingStat:null,
+              happiness:70, natureIdx:Math.floor(Math.random()*25), breedLetter:'S', status:null, sleepTurns:0,
+              movesPP:[], statStages:{atk:0,def:0,spa:0,spd:0,spe:0},
+              abilityName: pokeData.abilities[0]?.ability?.name||null,
+              heldItem:null, berries:{sitrusBerry:0,oranBerry:0,lumBerry:0,chestoBerry:0,rawstBerry:0},
+              learnableMoves:[]
+            };
+            data.myTeam = data.myTeam || [];
+            if (data.myTeam.length >= 6) data.myTeam[0] = newMon;
+            else data.myTeam.push(newMon);
+            await db.run('UPDATE game_saves SET save_data=?, updated_at=datetime(\'now\') WHERE user_id=?', JSON.stringify(data), u.id);
+            reply = `🦄 ${target}: ${pick} добавлен!`;
+          } catch(e) { reply = 'Ошибка PokeAPI'; }
+        }
+      } finally { unlock(); }
     }
   } else if (cmd === '!фикс' && parts[1]) {
     reply = await fixPlayer(parts[1], db, (m) => { if(m.baseLevel<50) m.baseLevel=50; m.maxHp=Math.floor(m.maxHp*1.5); m.currentHp=m.maxHp; }, '📈 уровни до 50');
@@ -200,12 +224,18 @@ async function claudeAutoReply(userText, io, db, username) {
 async function fixPlayer(username, db, fn, label) {
   const u = await db.get('SELECT id FROM users WHERE username = ?', username);
   if (!u) return 'Игрок не найден: ' + username;
-  const save = await db.get('SELECT save_data FROM game_saves WHERE user_id = ?', u.id);
-  if (!save) return 'Нет сохранения у ' + username;
-  let data = decompressSave(save.save_data);
-  (data.myTeam||[]).forEach(fn);
-  await db.run('UPDATE game_saves SET save_data=?, updated_at=datetime(\'now\') WHERE user_id=?', JSON.stringify(data), u.id);
-  return `${label}: ${username} (${data.myTeam.length} покемонов)`;
+  const unlock = await acquireSaveLock(u.id);
+  try {
+    const save = await db.get('SELECT save_data FROM game_saves WHERE user_id = ?', u.id);
+    if (!save) return 'Нет сохранения у ' + username;
+    let data = decompressSave(save.save_data);
+    if (!data) return 'Ошибка чтения сейва ' + username;
+    (data.myTeam||[]).forEach(fn);
+    if (!data.inventory) data.inventory = {};
+    data.inventory.credit = data.money;
+    await db.run('UPDATE game_saves SET save_data=?, updated_at=datetime(\'now\') WHERE user_id=?', JSON.stringify(data), u.id);
+    return `${label}: ${username} (${data.myTeam.length} покемонов)`;
+  } finally { unlock(); }
 }
 
 // In-memory rate limit for chat (5 msg/min per user, sliding window per user)
@@ -220,107 +250,98 @@ setInterval(() => {
 }, 30_000);
 
 // Send a chat message (auth required)
-router.post('/send', authMiddleware, async (req, res) => {
-  try {
-    // Per-user rate limit
-    const now = Date.now();
-    const userTimestamps = chatRateMap.get(req.userId) || [];
-    const recent = userTimestamps.filter(t => now - t < 60_000);
-    if (recent.length >= 5) {
-      return res.status(429).json({ error: 'Слишком часто! Подождите минуту.' });
-    }
-    recent.push(now);
-    chatRateMap.set(req.userId, recent);
-
-    const { text } = req.body;
-    if (!text || typeof text !== 'string' || text.trim().length === 0) {
-      return res.status(400).json({ error: 'Message text is required' });
-    }
-    if (text.length > 500) {
-      return res.status(400).json({ error: 'Message too long (max 500 chars)' });
-    }
-
-    const db = getDB();
-
-    // Get user info
-    const user = await db.get('SELECT username, first_name FROM users WHERE id = ?', req.userId);
-    if (!user) {
-      return res.status(404).json({ error: 'User not found' });
-    }
-
-    const result = await db.run(
-      `INSERT INTO chat_messages (user_id, username, first_name, text) VALUES (?, ?, ?, ?)`,
-      req.userId,
-      user.username || '',
-      user.first_name || '',
-      text.trim()
-    );
-
-    // Broadcast to all connected clients via Socket.IO
-    const msg = {
-      id: result.lastID,
-      user_id: req.userId,
-      username: user.username || '',
-      first_name: user.first_name || '',
-      text: text.trim(),
-      created_at: new Date().toISOString()
-    };
-    const io = getIO();
-    if (io) io.emit('chat_message', msg);
-
-    // Claude AI auto-reply (admin commands only)
-    claudeAutoReply(text.trim(), io, db, user.username);
-
-    res.json({ success: true });
-  } catch (err) {
-    console.error('Chat send error:', err);
-    res.status(500).json({ error: 'Internal server error' });
+router.post('/send', authMiddleware, asyncHandler(async (req, res) => {
+  // Per-user rate limit
+  const now = Date.now();
+  const userTimestamps = chatRateMap.get(req.userId) || [];
+  const recent = userTimestamps.filter(t => now - t < 60_000);
+  if (recent.length >= 5) {
+    return res.status(429).json({ error: 'Слишком часто! Подождите минуту.' });
   }
-});
+  recent.push(now);
+  chatRateMap.set(req.userId, recent);
+
+  const rawText = req.body.text;
+  if (!rawText || typeof rawText !== 'string' || rawText.trim().length === 0) {
+    return res.status(400).json({ error: 'Message text is required' });
+  }
+  const text = escHtml(rawText.trim().slice(0, 500)); // sanitize & enforce limit
+
+  const db = getDB();
+
+  // Get user info
+  const user = await db.get('SELECT username, first_name FROM users WHERE id = ?', req.userId);
+  if (!user) {
+    return res.status(404).json({ error: 'User not found' });
+  }
+
+  const result = await db.run(
+    `INSERT INTO chat_messages (user_id, username, first_name, text) VALUES (?, ?, ?, ?)`,
+    req.userId,
+    user.username || '',
+    user.first_name || '',
+    text,
+  );
+
+  // Broadcast to all connected clients via Socket.IO
+  const msg = {
+    id: result.lastID,
+    user_id: req.userId,
+    username: user.username || '',
+    first_name: user.first_name || '',
+    text: text.trim(),
+    created_at: new Date().toISOString()
+  };
+  const io = getIO();
+  if (io) io.emit('chat_message', msg);
+
+  // Claude AI auto-reply (admin commands only)
+  const isAdmin = user && (ADMIN_IDS.includes(Number(req.userId)) || ADMIN_USERNAMES.has(user.username));
+  if (isAdmin) {
+    claudeAutoReply(text.trim(), io, db, user.username);
+  }
+
+  res.json({ success: true });
+}));
 
 // Get chat messages (public, no auth required for reading)
-router.get('/messages', async (req, res) => {
-  try {
-    const db = getDB();
-    const since = req.query.since;
+router.get('/messages', asyncHandler(async (req, res) => {
+  const db = getDB();
+  const since = req.query.since;
 
-    let messages;
-    if (since) {
-      messages = await db.all(
-        `SELECT id, user_id, username, first_name, text, created_at
-         FROM chat_messages
-         WHERE created_at > ?
-         ORDER BY created_at ASC
-         LIMIT 50`,
-        since
-      );
-    } else {
-      messages = await db.all(
-        `SELECT id, user_id, username, first_name, text, created_at
-         FROM chat_messages
-         ORDER BY created_at DESC
-         LIMIT 50`
-      );
-      messages.reverse();
-    }
-
-    res.json({ messages });
-  } catch (err) {
-    console.error('Chat messages error:', err);
-    res.status(500).json({ error: 'Internal server error' });
+  let messages;
+  if (since) {
+    messages = await db.all(
+      `SELECT id, user_id, username, first_name, text, created_at
+       FROM chat_messages
+       WHERE created_at > ?
+       ORDER BY created_at ASC
+       LIMIT 50`,
+      since
+    );
+  } else {
+    messages = await db.all(
+      `SELECT id, user_id, username, first_name, text, created_at
+       FROM chat_messages
+       ORDER BY created_at DESC
+       LIMIT 50`
+    );
+    messages.reverse();
   }
-});
+
+  res.json({ messages });
+}));
 
 // Bot endpoint — Claude can send messages
-router.post('/bot', async (req, res) => {
+router.post('/bot', asyncHandler(async (req, res) => {
   const { text, token } = req.body;
-  if (token !== (process.env.BOT_TOKEN || 'claude-admin-2026')) return res.status(401).json({ error: 'Unauthorized' });
+  if (!process.env.BOT_TOKEN || token !== process.env.BOT_TOKEN) return res.status(401).json({ error: 'Unauthorized' });
   if (!text) return res.status(400).json({ error: 'Text required' });
   const db = getDB();
   const io = getIO();
   const msg = await sendClaudeMessage(text, io, db);
   res.json({ success: true, msg });
-});
+}));
 
 export { sendClaudeMessage, CLAUDE_USERNAME, CLAUDE_NAME, CLAUDE_ID };
 export default router;

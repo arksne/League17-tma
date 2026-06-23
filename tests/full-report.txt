@@ -1,0 +1,123 @@
+===== RUNNING ALL TESTS =====
+Started: бш, 21-май 2026 ж, 19:33:57 +06
+
+--- Data Validation ---
+  ✓ 4737: Gym ilde_stadium rewardItem graphiteBell exists
+
+=== RESULTS: 4737/4737 passed ===
+PASS
+--- Server API ---
+  Passed: 29/29
+  Failed: 0/29
+  Completed at: 2026-05-21T13:34:21.822Z
+PASS
+--- Save Validation ---
+  Passed: 27/27
+  Failed: 0/27
+  Completed at: 2026-05-21T13:36:54.379Z
+PASS
+--- Game Logic ---
+  Passed: 7/20
+  Failed: 13/20
+  Completed at: 2026-05-21T13:38:41.200Z
+PASS
+--- Move System ---
+=== MOVE SYSTEM & LEARNING TESTS ===
+
+
+--- 1. Move buttons in battle ---
+FATAL: page.evaluate: TypeError: window.__triggerEncounter is not a function
+    at eval (eval at evaluate (:302:30), <anonymous>:1:14)
+    at UtilityScript.evaluate (<anonymous>:304:16)
+    at UtilityScript.<anonymous> (<anonymous>:1:44)
+FAIL
+--- Gym Leaders ---
+  ✓ 40: Training stages increase through regions
+
+=== RESULT: 40/40 passed ===
+PASS
+--- Item System ---
+  ✓ 34: Held items defined: 15/15
+
+=== RESULT: 34/34 passed ===
+PASS
+--- Breeding ---
+  ✓ 24: PC box exists for egg storage
+
+=== RESULT: 24/24 passed ===
+PASS
+--- Stress Test ---
+=== COMPREHENSIVE STRESS TEST ===
+
+
+--- PHASE 1: Core Formulas ---
+  ✓ 1: HP formula: base78 IV20 lv36 = 109
+  ✓ 2: HP formula: base108 IV31 lv50 = 183
+  ✓ 3: HP formula: base130 IV0 lv100 = 370
+  ✓ 4: EV total 0 candies 0 vitamins = 0
+  ✓ 5: EV total 1 candy 0 vitamins = 4
+  ✓ 6: EV total 0 candies 1 vitamin = 10
+  ✓ 7: EV total 3 candies 2 vitamins = 32
+  ✓ 8: EV total 10 candies 10 vitamins = 140
+  ✓ 9: EV total 0 candies 0 vitamins = 0
+  ✓ 10: 5 weather types exist
+  ✓ 11: Clear is valid
+  ✓ 12: Rain is valid
+  ✓ 13: Sun is valid
+  ✓ 14: Sandstorm is valid
+  ✓ 15: Hail is valid
+  ✓ 16: Type: fire→grass = 2x
+  ✓ 17: Type: grass→fire = 0.5x
+  ✓ 18: Type: water→fire = 2x
+  ✓ 19: Type: ghost→normal = 0x (immune)
+  ✓ 20: Type: fighting→normal = 2x
+  ✓ 21: Type: fire→water = 0.5x
+
+--- PHASE 2: Game State Injection ---
+
+--- PHASE 3: Inventory & Items ---
+  ✓ 22: Inventory items rendered: 14
+  ✓ 23: Potion button visible: true
+  ✓ 24: Candy button visible: true
+  ✓ 25: Vitamin button visible: true
+  ✓ 26: Training button visible: true
+  ✓ 27: Weaken button visible: true
+  ✓ 28: Super Potion button visible: true
+  ✓ 29: Full Restore button visible: true
+  ✓ 30: Evolution Stone button visible: true
+  ✓ 31: TM button visible: true
+  ✓ 32: Item potion qty = 5 (got 5)
+  ✓ 33: Item candy qty = 3 (got 3)
+  ✓ 34: Item vitamin qty = 3 (got 3)
+  ✓ 35: Item train qty = 2 (got 2)
+  ✓ 36: Item weaken qty = 2 (got 2)
+  ✓ 37: Item super-potion qty = 3 (got 3)
+  ✓ 38: Item full-restore qty = 2 (got 2)
+  ✓ 39: Item evolution-stone qty = 2 (got 2)
+  ✓ 40: Item tm qty = 1 (got 1)
+  ✗ 41: Potion: HP 0 → 0
+  ✗ 42: Candy: level 5 → 5
+  ✗ 43: Vitamin: EV total 0 → 0
+  ✗ 44: Training: Отсутствует → Отсутствует
+  ✗ 45: Full Restore: HP = 0
+  ✓ 46: Full Restore: status cleared (display: none)
+
+--- PHASE 4: Pokedex ---
+  ✓ 47: Pokedex count shown: Поймано: 1 / 1051
+  ✓ 48: Pokedex cells: 1051
+
+--- PHASE 5: Quests ---
+  ✓ 49: Quest modal shows content: true
+  ✓ 50: Quest has progress 2/5
+  ✓ 51: Quest has reward 500
+
+--- PHASE 6: Encounter & Battle ---
+FATAL: page.evaluate: TypeError: window.__triggerEncounter is not a function
+    at eval (eval at evaluate (:302:30), <anonymous>:1:14)
+    at UtilityScript.evaluate (<anonymous>:304:16)
+    at UtilityScript.<anonymous> (<anonymous>:1:44)
+FAIL
+
+===== DONE =====
+Finished: бш, 21-май 2026 ж, 19:39:21 +06
+SOME TESTS FAILED

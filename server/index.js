@@ -1,3 +1,6 @@
+// Load env vars FIRST — before any other imports that might read them
+import './load-env.js';
+
 import express from 'express';
 import cors from 'cors';
 import rateLimit from 'express-rate-limit';
@@ -12,36 +15,31 @@ import leaderboardRoutes from './routes/leaderboard.js';
 import chatRoutes from './routes/chat.js';
 import profileRoutes from './routes/profile.js';
 import adminRoutes from './routes/admin.js';
+import battleRoutes from './routes/battle.js';
+import questsRoutes from './routes/quests.js';
+import achievementsRoutes from './routes/achievements.js';
+import economyRoutes from './routes/economy.js';
 import { initSocket } from './socket.js';
+import { config } from './lib/config.js';
+import { logger, requestLogger } from './lib/logger.js';
+import { errorHandler } from './lib/errors.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const app = express();
-const PORT = process.env.PORT || 3000;
+const PORT = config.PORT;
 
 // Trust proxy for Railway/Heroku/etc.
 app.set('trust proxy', 1);
 
 // CORS
-const allowedOrigin = process.env.ALLOWED_ORIGIN;
+const allowedOrigin = config.ALLOWED_ORIGIN;
 app.use(cors(allowedOrigin ? { origin: allowedOrigin } : {}));
 app.use(express.json({ limit: '10mb' }));
 
-// Request logging + file log
-const logStream = fs.createWriteStream('/tmp/pokematrix-server.log', { flags: 'a' });
-app.use((req, res, next) => {
-  const start = Date.now();
-  res.on('finish', () => {
-    const ms = Date.now() - start;
-    const line = `[${new Date().toISOString()}] ${req.method} ${req.originalUrl} → ${res.statusCode} ${ms}ms`;
-    logStream.write(line + '\n');
-    if (res.statusCode >= 400) {
-      logStream.write(`  ERROR: ${req.method} ${req.originalUrl} → ${res.statusCode}\n`);
-    }
-  });
-  next();
-});
+// Structured request logging via Pino
+app.use(requestLogger);
 
 // Serve static files FIRST — before rate limiter to avoid 429 on assets
 app.use(express.static(path.join(__dirname, '../dist'), { maxAge: '1d', immutable: true }));
@@ -61,14 +59,15 @@ app.use('/api/save', rateLimit({ windowMs: 60 * 1000, max: 30, standardHeaders: 
 app.use('/api/leaderboard', leaderboardRoutes);
 app.use('/api/chat', chatRoutes);
 app.use('/api/profile', profileRoutes);
+app.use('/api/battle', battleRoutes);
+app.use('/api/quests', questsRoutes);
+app.use('/api/achievements', achievementsRoutes);
+app.use('/api/economy', economyRoutes);
 
-// Client-side error log endpoint
-const clientLogStream = fs.createWriteStream('/tmp/pokematrix-client-errors.log', { flags: 'a' });
+// Client-side error log endpoint (forwarded to Pino)
 app.post('/api/log-client-error', (req, res) => {
   const { msg, src, line, col, stack, url } = req.body || {};
-  const line2 = `[${new Date().toISOString()}] ${msg} (${src}:${line}:${col}) ${url || ''}`;
-  clientLogStream.write(line2 + '\n');
-  if (stack) clientLogStream.write('  STACK: ' + stack.slice(0, 500) + '\n');
+  logger.warn({ msg, src, line, col, url, stack: stack?.slice(0, 500) }, 'Client error');
   res.json({ ok: true });
 });
 
@@ -83,6 +82,44 @@ app.get('/api/health', async (req, res) => {
   }
 });
 
+// PokeAPI proxy with SQLite cache
+app.get('/api/pokeapi/{*path}', async (req, res) => {
+  try {
+    const apiPath = req.path.replace('/api/pokeapi/', '');
+    if (!apiPath) return res.status(400).json({ error: 'Missing path' });
+
+    const db = getDB();
+    const cacheKey = '/api/v2/' + apiPath;
+
+    // Check cache (no staleness — PokeAPI data is static)
+    const cached = await db.get('SELECT data FROM pokeapi_cache WHERE url = ?', cacheKey);
+    if (cached) return res.json(JSON.parse(cached.data));
+
+    // Fetch from PokeAPI
+    const url = `https://pokeapi.co${cacheKey}`;
+    const pokeRes = await fetch(url);
+
+    if (!pokeRes.ok) {
+      const body = await pokeRes.text().catch(() => '');
+      return res.status(pokeRes.status).json({ error: `PokeAPI ${pokeRes.status}`, detail: body.substring(0, 200) });
+    }
+
+    const data = await pokeRes.json();
+
+    // Store in cache
+    await db.run(
+      `INSERT INTO pokeapi_cache (url, data, cached_at) VALUES (?, ?, datetime('now'))
+       ON CONFLICT(url) DO UPDATE SET data = excluded.data, cached_at = datetime('now')`,
+      cacheKey, JSON.stringify(data)
+    );
+
+    res.json(data);
+  } catch (e) {
+    logger.error({ err: e }, 'PokeAPI proxy error');
+    res.status(502).json({ error: 'PokeAPI proxy failed' });
+  }
+});
+
 // Drop config endpoint (public, for clients)
 app.get('/api/drops', (req, res) => {
   const dropsPath = path.join(__dirname, '../data/drop_config.json');
@@ -94,15 +131,11 @@ app.get('/api/drops', (req, res) => {
       // fall through to default
     }
   }
-  // Fallback: serve from MONSTER_DROP_TABLE + UNIVERSAL_DROPS
-  res.json({
-    universalDrops: [],
-    monsterDrops: MONSTER_DROP_TABLE,
-  });
+  // Fallback: serve from MONSTER_DROP_TABLE (client uses its own UNIVERSAL_DROPS)
+  res.json({ monsterDrops: MONSTER_DROP_TABLE });
 });
 
-// Serve static files with caching (reduce 429s on assets)
-app.use(express.static(path.join(__dirname, '../dist'), { maxAge: '1d', immutable: true }));
+// Avatars
 app.use('/avatars', express.static(path.join(__dirname, '../public/avatars'), { maxAge: '1d' }));
 
 // SPA fallback — must be AFTER static but BEFORE error handler
@@ -120,10 +153,7 @@ app.use((req, res, next) => {
 });
 
 // Global error handler — MUST be last middleware
-app.use((err, req, res, next) => {
-  console.error('Unhandled error:', err.stack || err.message);
-  res.status(500).json({ error: 'Internal server error' });
-});
+app.use(errorHandler);
 
 // === Periodic WAL checkpoint (every 5 min) ===
 let walInterval = null;
@@ -134,14 +164,14 @@ function startWALCheckpoint() {
       const db = getDB();
       await db.exec('PRAGMA wal_checkpoint(TRUNCATE)');
     } catch (e) {
-      /* DB might be busy, skip */
+      logger.debug({ err: e }, 'WAL checkpoint skipped (busy)');
     }
   }, 300_000);
 }
 
 // === Graceful shutdown ===
 async function shutdown(signal) {
-  console.log(`\n${signal} received, shutting down gracefully...`);
+  logger.info(`${signal} received, shutting down gracefully...`);
 
   if (walInterval) clearInterval(walInterval);
 
@@ -152,7 +182,7 @@ async function shutdown(signal) {
   } catch (e) { /* ignore */ }
 
   await closeDB();
-  console.log('Database closed.');
+  logger.info('Database closed.');
   process.exit(0);
 }
 
@@ -161,12 +191,12 @@ process.on('SIGINT', () => shutdown('SIGINT'));
 
 // Unhandled rejections → log but don't crash
 process.on('unhandledRejection', (reason) => {
-  console.error('Unhandled Rejection:', reason instanceof Error ? reason.message : reason);
+  logger.error({ err: reason }, 'Unhandled Rejection');
 });
 
 process.on('uncaughtException', (err) => {
-  console.error('Uncaught Exception:', err.message);
-  // Don't exit — let the process try to recover
+  logger.error({ err }, 'Uncaught Exception');
+  shutdown('UNCAUGHT');
 });
 
 // === Startup ===
@@ -181,7 +211,7 @@ try {
     if (user) {
       const save = await db.get('SELECT save_data, updated_at FROM game_saves WHERE user_id = ?', user.id);
       const lb = await db.get('SELECT badges_count, team_level_sum, money FROM leaderboard WHERE user_id = ?', user.id);
-      console.log(`[backup] ${user.username} (ID:${user.id}): badges=${lb?.badges_count || 0} lvl_sum=${lb?.team_level_sum || 0} money=${lb?.money || 0} saved=${save?.updated_at || 'never'}`);
+      logger.info(`[backup] ${user.username} (ID:${user.id}): badges=${lb?.badges_count || 0} lvl_sum=${lb?.team_level_sum || 0} money=${lb?.money || 0} saved=${save?.updated_at || 'never'}`);
       if (save) {
         const dir = path.join(__dirname, '../data/backups');
         fs.mkdirSync(dir, { recursive: true });
@@ -191,16 +221,16 @@ try {
   }
 
   const server = app.listen(PORT, () => {
-    console.log(`PokeMatrix server running on port ${PORT}`);
+    logger.info(`PokeMatrix server running on port ${PORT}`);
   });
 
   initSocket(server, allowedOrigin);
   startWALCheckpoint();
 
   server.on('error', (err) => {
-    console.error('Server error:', err.message);
+    logger.error({ err }, 'Server error');
   });
 } catch (err) {
-  console.error('Failed to start server:', err);
+  logger.error({ err }, 'Failed to start server');
   process.exit(1);
 }

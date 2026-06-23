@@ -1,0 +1,38 @@
+=== BREEDING & EGG SYSTEM TEST ===
+
+--- Breeding Data Validation ---
+
+  ✓ 1: EGG_TIME is 10 min
+  ✓ 2: EGG_BONUS_TIME is 5 min
+  ✓ 3: Egg has uid
+  ✓ 4: Egg has species
+  ✓ 5: Egg has types array
+  ✓ 6: Egg has IVs (6 stats)
+  ✓ 7: Egg IVs all 0-31
+  ✓ 8: Egg has future readyTime
+  ✓ 9: Egg has boxIdx
+  ✓ 10: Male mon has gender=male
+  ✓ 11: Female mon has gender=female
+  ✓ 12: Two mons have different UIDs
+  ✓ 13: Male mon has apiData.species
+
+--- PC Box Breeding Setup ---
+
+  ✓ 14: PC box 0 has 2 mons
+  ✓ 15: Box has male mon
+  ✓ 16: Box has female mon
+
+--- Egg in Team Display ---
+
+  ✓ 17: Team has 1 mon with isEgg=true
+  ✓ 18: Eggs array has 1 entry
+  ✓ 19: Egg species is pikachu
+  ✓ 20: Team grid shows egg slot
+  ✓ 21: Egg round-trip: species charmander
+  ✓ 22: Egg round-trip: boxIdx 1
+  ✓ 23: Egg can exist in PC box (not in team)
+  ✓ 24: PC box exists for egg storage
+
+=== RESULT: 24/24 passed ===
+
+=== RESULT: 24/24 passed ===

@@ -2,50 +2,64 @@ import { Router } from 'express';
 import { getDB } from '../db.js';
 import { authMiddleware } from '../middleware/auth.js';
 import { readFileSync, writeFileSync, existsSync, mkdirSync } from 'fs';
-import zlib from 'zlib';
-import { join, dirname } from 'path';
+import { dirname, join } from 'path';
 import { fileURLToPath } from 'url';
 import { MONSTER_DROP_TABLE } from '../../src/data/drops.js';
+import { decompressSave } from '../lib/save-utils.js';
+import { getIO, notifyUser } from '../socket.js';
+import { asyncHandler, AppError } from '../lib/errors.js';
+import { logger } from '../lib/logger.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const router = Router();
 
+const ADMIN_IDS = (process.env.ADMIN_IDS || '1394113078').split(',').map(Number).filter(n => !isNaN(n));
 const ADMIN_USERNAMES = (process.env.ADMIN_USERNAMES || 'nineinchkn5atmythroat').split(',');
 const ADMIN_PASS = process.env.ADMIN_PASS;
-
-function decompressSave(raw) {
-  if (!raw) return null;
-  if (raw.startsWith('Z:')) {
-    try { return JSON.parse(zlib.inflateSync(Buffer.from(raw.slice(2), 'base64')).toString()); } catch(e) { console.error('decompressSave zlib err:', e.message); }
-  }
-  try { return JSON.parse(raw); } catch(e) { console.error('decompressSave JSON err:', e.message); return null; }
-}
 
 // Load admin HTML template once
 let ADMIN_HTML = '';
 try { ADMIN_HTML = readFileSync(join(__dirname, 'admin.html'), 'utf8'); } catch(e) { ADMIN_HTML = '<h1>admin.html not found</h1>'; }
 
+function parseCookies(req) {
+  const cookies = {};
+  if (req.headers.cookie) {
+    req.headers.cookie.split(';').forEach(c => {
+      const idx = c.indexOf('=');
+      if (idx > -1) cookies[c.slice(0, idx).trim()] = decodeURIComponent(c.slice(idx + 1).trim());
+    });
+  }
+  return cookies;
+}
+
 function adminAuth(req, res, next) {
-  const token = req.query.token || req.headers['x-admin-token'];
-  if (ADMIN_PASS && token === ADMIN_PASS) return next();
-  if (!ADMIN_PASS && !token) {
-    return authMiddleware(req, res, async () => {
-      const db = getDB();
-      const user = await db.get('SELECT username FROM users WHERE id = ?', req.userId);
-      if (user && ADMIN_USERNAMES.includes(user.username)) { req.adminUsername = user.username; return next(); }
-      return res.status(403).json({ error: 'Admin access required' });
-    });
+  const cookies = parseCookies(req);
+  const token = req.headers['x-admin-token'] || req.query.token || cookies.admin_token;
+
+  // If ADMIN_PASS is set, use password auth
+  if (ADMIN_PASS) {
+    if (token === ADMIN_PASS) {
+      // Set httpOnly cookie on first auth so subsequent requests don't need ?token=
+      if (!cookies.admin_token && req.method === 'GET') {
+        res.setHeader('Set-Cookie', `admin_token=${encodeURIComponent(ADMIN_PASS)}; Path=/admin; HttpOnly; SameSite=Lax; Max-Age=86400`);
+      }
+      return next();
+    }
+    // Show login page for GET /admin without token
+    if (req.path === '/' && req.method === 'GET' && !token) return res.send(loginPage());
+    return res.status(401).json({ error: 'Unauthorized' });
   }
-  if (req.path === '/' && !token) return res.send(loginPage());
-  if (!token) {
-    return authMiddleware(req, res, async () => {
-      const db = getDB();
-      const user = await db.get('SELECT username FROM users WHERE id = ?', req.userId);
-      if (user && ADMIN_USERNAMES.includes(user.username)) { req.adminUsername = user.username; return next(); }
-      return res.status(403).json({ error: 'Admin access required' });
-    });
-  }
-  return res.status(401).json({ error: 'Unauthorized' });
+
+  // No ADMIN_PASS — use Telegram-based auth
+  return authMiddleware(req, res, async () => {
+    const db = getDB();
+    const user = await db.get('SELECT username FROM users WHERE id = ?', req.userId);
+    if (user && (ADMIN_IDS.includes(Number(req.userId)) || ADMIN_USERNAMES.includes(user.username))) {
+      req.adminUsername = user.username;
+      return next();
+    }
+    return res.status(403).json({ error: 'Admin access required' });
+  });
 }
 
 function loginPage() {
@@ -53,17 +67,54 @@ function loginPage() {
 <style>body{font-family:monospace;background:#0a0a0a;color:#fff;display:flex;align-items:center;justify-content:center;height:100vh;margin:0}
 input{padding:10px;font-size:1.2rem;border:2px solid #333;border-radius:6px;background:#111;color:#fff;width:200px}
 button{padding:10px 20px;font-size:1.2rem;border:none;border-radius:6px;background:#af52de;color:#fff;cursor:pointer}
-</style></head><body><form onsubmit="event.preventDefault(); location.href='?token='+encodeURIComponent(document.getElementById('p').value)"><input id="p" type="password" placeholder="Password" autofocus><button>Login</button></form></body></html>`;
+#error{color:#ff4444;display:none;margin-top:10px}
+</style></head><body>
+<form id="loginForm"><input id="p" type="password" placeholder="Password" autofocus><button type="submit">Login</button></form>
+<div id="error"></div>
+<script>
+document.getElementById('loginForm').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const pwd = document.getElementById('p').value;
+  try {
+    const r = await fetch('login', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({token: pwd})
+    });
+    if (r.ok) { location.href = location.pathname; }
+    else { const d = await r.json(); document.getElementById('error').textContent = d.error || 'Login failed'; document.getElementById('error').style.display = 'block'; }
+  } catch(e) { document.getElementById('error').textContent = 'Network error'; document.getElementById('error').style.display = 'block'; }
+});
+</script>
+</body></html>`;
 }
 
 function esc(s) { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
 
+// POST login endpoint — accepts token in body, sets httpOnly cookie
+router.post('/login', asyncHandler(async (req, res) => {
+  try {
+    logger.info('Login attempt from IP:', req.ip || req.socket.remoteAddress);
+    const { token } = req.body || {};
+    if (!token) return res.status(400).json({ error: 'Token is required' });
+    if (ADMIN_PASS && token === ADMIN_PASS) {
+      res.setHeader('Set-Cookie', `admin_token=${encodeURIComponent(ADMIN_PASS)}; Path=/admin; HttpOnly; SameSite=Lax; Max-Age=86400`);
+      return res.json({ ok: true });
+    }
+    return res.status(401).json({ error: 'Invalid password' });
+  } catch (e) {
+    logger.error('Login error:', e);
+    return res.status(500).json({ error: e.message });
+  }
+}));
+
 // --- Dashboard ---
-router.get('/', adminAuth, async (req, res) => {
+router.get('/', adminAuth, asyncHandler(async (req, res) => {
   const db = getDB();
   const users = await db.all('SELECT id, telegram_id, username, first_name FROM users ORDER BY id');
   const lb = await db.all('SELECT u.username, u.first_name, l.* FROM leaderboard l JOIN users u ON u.id=l.user_id ORDER BY l.badges_count DESC LIMIT 30');
-  const token = req.query.token || '';
+  const cookies = parseCookies(req);
+  const token = req.query.token || cookies.admin_token || '';
 
   const userOptions = users.map(u =>
     `<option value="${u.id}">#${u.id} ${esc(u.username||'?')} (${esc(u.first_name||'')})</option>`
@@ -79,34 +130,37 @@ router.get('/', adminAuth, async (req, res) => {
     .replace('__ADMIN_USERNAME__', esc(req.adminUsername || ''));
 
   res.send(html);
-});
+}));
 
 // --- Admin API ---
-router.get('/api', adminAuth, async (req, res) => {
+// Shared helpers for admin API handlers
+async function resolveUser(idOrName) {
+  const db = getDB();
+  const byId = await db.get('SELECT id FROM users WHERE id = ?', parseInt(idOrName, 10));
+  if (byId) return byId;
+  return await db.get('SELECT id FROM users WHERE username = ?', idOrName);
+}
+
+async function getSave(u) {
+  const db = getDB();
+  const row = await db.get('SELECT save_data FROM game_saves WHERE user_id = ?', u.id);
+  if (!row) return null;
+  return decompressSave(row.save_data);
+}
+
+async function putSave(u, data) {
+  const db = getDB();
+  data._v = Date.now();
+  await db.run('UPDATE game_saves SET save_data = ?, updated_at = datetime(\'now\') WHERE user_id = ?', JSON.stringify(data), u.id);
+  try {
+    notifyUser(u.id, 'save_updated', {});
+  } catch(e) {}
+}
+
+router.get('/api', adminAuth, asyncHandler(async (req, res) => {
   const { cmd, user, val } = req.query;
   const db = getDB();
   let result = { cmd, user };
-
-  async function resolveUser(idOrName) {
-    const byId = await db.get('SELECT id FROM users WHERE id = ?', parseInt(idOrName, 10));
-    if (byId) return byId;
-    return await db.get('SELECT id FROM users WHERE username = ?', idOrName);
-  }
-
-  async function getSave(u) {
-    const row = await db.get('SELECT save_data FROM game_saves WHERE user_id = ?', u.id);
-    if (!row) return null;
-    return decompressSave(row.save_data);
-  }
-
-  async function putSave(u, data) {
-    data._v = Date.now();
-    await db.run('UPDATE game_saves SET save_data = ?, updated_at = datetime(\'now\') WHERE user_id = ?', JSON.stringify(data), u.id);
-    try {
-      const { notifyUser } = await import('../socket.js');
-      notifyUser(u.id, 'save_updated', {});
-    } catch(e) {}
-  }
 
   try {
     if (!user) { result.error = 'Missing user parameter'; return res.json(result); }
@@ -115,10 +169,10 @@ router.get('/api', adminAuth, async (req, res) => {
     if (cmd === 'get_save') {
       if (!u) { result.error = 'User not found'; return res.json(result); }
       const save = await getSave(u);
+      if (!save) { result.error = 'No save data for this user'; return res.json(result); }
       let POKEDEX_ALL = [];
       try {
-        const fs = await import('fs'); const path = await import('path');
-        const pdata = JSON.parse(fs.readFileSync(path.join(process.cwd(), 'public/pokedex_data.json'), 'utf8'));
+        const pdata = JSON.parse(readFileSync(join(process.cwd(), 'public/pokedex_data.json'), 'utf8'));
         POKEDEX_ALL = Object.keys(pdata);
       } catch(e) {}
       result = { status: 'ok', userId: u.id, username: user, save, pokedexAll: POKEDEX_ALL };
@@ -134,9 +188,9 @@ router.get('/api', adminAuth, async (req, res) => {
       const dropsDir = join(__dirname, '../../data');
       const dropsPath = join(dropsDir, 'drop_config.json');
       const UNIVERSAL_DROPS_DEFAULT = [
-        { item: 'quartz', chance: 0.03, qty: 1 },
-        { item: 'malachite', chance: 0.01, qty: 1 },
-        { item: 'goldNugget', chance: 0.01, qty: 1 },
+        { item: 'prettyWing', chance: 0.04, qty: 1 },
+        { item: 'nugget', chance: 0.02, qty: 1 },
+        { item: 'starPiece', chance: 0.01, qty: 1 },
       ];
       let config;
       try {
@@ -192,7 +246,6 @@ router.get('/api', adminAuth, async (req, res) => {
         speciesList = val.split(',');
       } else {
         try {
-          const { readFileSync } = await import('fs'); const { join } = await import('path');
           const pdata = JSON.parse(readFileSync(join(process.cwd(), 'public/pokedex_data.json'), 'utf8'));
           // Только первая эволюция: исключаем тех, у кого method === 'Эволюция'
           speciesList = Object.entries(pdata)
@@ -260,7 +313,7 @@ router.get('/api', adminAuth, async (req, res) => {
       result = { status: 'ok', location: val };
 
     } else if (cmd === 'reset_save') {
-      save = { _v: Date.now(), myTeam:[], pcBoxes:[[]], inventory:{}, money:500, badges:[], pokedexSeen:[], pokedexCaught:[], quests:[], questProgress:{}, completedQuests:[], npcQuestProgress:{}, completedNPCQuests:[], tutorialStep:0, currentLocationId:'goldenrod', currentRegion:'east_johto' };
+      save = { _v: Date.now(), myTeam:[], pcBoxes:[[]], inventory:{}, money:500, badges:[], pokedexSeen:[], pokedexCaught:[], quests:[], questProgress:{}, completedQuests:[], npcQuestProgress:{}, completedNPCQuests:[], tutorialStep:0, currentLocationId:'goldenrod', currentRegion:'johto' };
       await putSave(u, save);
       result = { status: 'ok', reset: true };
 
@@ -388,8 +441,7 @@ router.get('/api', adminAuth, async (req, res) => {
       save.pokedexSeen = []; save.pokedexCaught = [];
       if (val === 'caught') {
         try {
-          const fs = await import('fs'); const path = await import('path');
-          save.pokedexCaught = Object.keys(JSON.parse(fs.readFileSync(path.join(process.cwd(), 'public/pokedex_data.json'), 'utf8')));
+          save.pokedexCaught = Object.keys(JSON.parse(readFileSync(join(process.cwd(), 'public/pokedex_data.json'), 'utf8')));
         } catch(e) {}
       }
       await putSave(u, save);
@@ -449,7 +501,7 @@ router.get('/api', adminAuth, async (req, res) => {
 
     } else if (cmd === 'broadcast') {
       try {
-        const io = (await import('../socket.js')).getIO();
+        const io = getIO();
         if (io) { io.emit('broadcast', { message: val || 'Сообщение от админа' }); result.sent = true; }
         else result.sent = false;
       } catch(e) { result.error = 'Broadcast failed: '+e.message; }
@@ -460,43 +512,35 @@ router.get('/api', adminAuth, async (req, res) => {
     }
   } catch(e) { result.error = e.message; }
   res.json(result);
-});
+}));
 
 // POST for raw JSON save (admin only)
-router.post('/api', adminAuth, async (req, res) => {
+router.post('/api', adminAuth, asyncHandler(async (req, res) => {
   const { cmd, user } = req.query;
   const db = getDB();
   if (cmd !== 'set_save') return res.status(400).json({ error: 'POST only for set_save' });
 
-  async function resolveUser(idOrName) {
-    const byId = await db.get('SELECT id FROM users WHERE id = ?', parseInt(idOrName));
-    if (byId) return byId;
-    return await db.get('SELECT id FROM users WHERE username = ?', idOrName);
+  const u = await resolveUser(user);
+  if (!u) return res.json({ error: 'User not found' });
+  // Validate that body is a non-null object with required save fields
+  const data = req.body;
+  if (!data || typeof data !== 'object' || Array.isArray(data)) {
+    return res.status(400).json({ error: 'Body must be a JSON object' });
   }
-
-  try {
-    const u = await resolveUser(user);
-    if (!u) return res.json({ error: 'User not found' });
-    // Validate that body is a non-null object with required save fields
-    const data = req.body;
-    if (!data || typeof data !== 'object' || Array.isArray(data)) {
-      return res.status(400).json({ error: 'Body must be a JSON object' });
-    }
-    if (data.myTeam && !Array.isArray(data.myTeam)) {
-      return res.status(400).json({ error: 'myTeam must be an array' });
-    }
-    if (data.money !== undefined && typeof data.money !== 'number') {
-      return res.status(400).json({ error: 'money must be a number' });
-    }
-    // Size limit: 10MB
-    const raw = JSON.stringify(data);
-    if (raw.length > 10 * 1024 * 1024) {
-      return res.status(400).json({ error: 'Save data too large' });
-    }
-    await db.run('UPDATE game_saves SET save_data = ?, updated_at = datetime(\'now\') WHERE user_id = ?', raw, u.id);
-    res.json({ status: 'ok', saved: true });
-  } catch(e) { res.json({ error: e.message }); }
-});
+  if (data.myTeam && !Array.isArray(data.myTeam)) {
+    return res.status(400).json({ error: 'myTeam must be an array' });
+  }
+  if (data.money !== undefined && typeof data.money !== 'number') {
+    return res.status(400).json({ error: 'money must be a number' });
+  }
+  // Size limit: 10MB
+  const raw = JSON.stringify(data);
+  if (raw.length > 10 * 1024 * 1024) {
+    return res.status(400).json({ error: 'Save data too large' });
+  }
+  await db.run('UPDATE game_saves SET save_data = ?, updated_at = datetime(\'now\') WHERE user_id = ?', raw, u.id);
+  res.json({ status: 'ok', saved: true });
+}));
 
 router.get('/health', (req, res) => res.json({ ok: true }));
 
@@ -527,24 +571,23 @@ function makeMon(pokeData, trainerId, level) {
   };
 }
 
-// Items catalog endpoint (for admin drops UI)
+// Items catalog endpoint (for admin drops UI, loaded from static JSON)
+let _cachedItemsCatalog = null;
+const ITEMS_JSON_PATH = join(__dirname, '../../data/items.json');
 router.get('/api/items', adminAuth, (req, res) => {
+  if (_cachedItemsCatalog) {
+    return res.json({ status: 'ok', items: _cachedItemsCatalog });
+  }
   try {
-    const itemsPath = join(__dirname, '../../src/data/items.js');
-    const src = readFileSync(itemsPath, 'utf8');
-    // Extract ITEMS array via regex
-    const match = src.match(/export const ITEMS\s*=\s*(\[[\s\S]*?\]);/);
-    if (!match) return res.json({ error: 'Could not parse items' });
-    // Evaluate safely — items.js is a simple array of objects
-    const items = eval('(' + match[1] + ')');
-    const catalog = items
+    const items = JSON.parse(readFileSync(ITEMS_JSON_PATH, 'utf8'));
+    _cachedItemsCatalog = items
       .filter(item => item.implemented !== false)
       .map(item => ({
         id: item.id,
         nameRu: item.nameRu || item.id,
         category: item.category || 'other',
       }));
-    return res.json({ status: 'ok', items: catalog });
+    return res.json({ status: 'ok', items: _cachedItemsCatalog });
   } catch (e) {
     return res.json({ error: e.message });
   }
@@ -552,14 +595,10 @@ router.get('/api/items', adminAuth, (req, res) => {
 
 // Species catalog endpoint (for admin drops UI)
 router.get('/api/species', adminAuth, (req, res) => {
-  try {
-    const pdataPath = join(process.cwd(), 'public/pokedex_data.json');
-    const pdata = JSON.parse(readFileSync(pdataPath, 'utf8'));
-    const species = Object.keys(pdata).sort();
-    return res.json({ status: 'ok', species });
-  } catch (e) {
-    return res.json({ error: e.message });
-  }
+  const pdataPath = join(process.cwd(), 'public/pokedex_data.json');
+  const pdata = JSON.parse(readFileSync(pdataPath, 'utf8'));
+  const species = Object.keys(pdata).sort();
+  return res.json({ status: 'ok', species });
 });
 
 // POST endpoint for drops (avoids URL length limits of GET)
@@ -567,16 +606,12 @@ router.post('/api/drops', adminAuth, (req, res) => {
   const dropsDir = join(__dirname, '../../data');
   mkdirSync(dropsDir, { recursive: true });
   const dropsPath = join(dropsDir, 'drop_config.json');
-  try {
-    const newConfig = req.body;
-    if (!newConfig || typeof newConfig !== 'object') {
-      return res.json({ error: 'Invalid JSON body' });
-    }
-    writeFileSync(dropsPath, JSON.stringify(newConfig, null, 2));
-    return res.json({ status: 'ok', saved: true });
-  } catch (e) {
-    return res.json({ error: 'Save failed: ' + e.message });
+  const newConfig = req.body;
+  if (!newConfig || typeof newConfig !== 'object') {
+    return res.json({ error: 'Invalid JSON body' });
   }
+  writeFileSync(dropsPath, JSON.stringify(newConfig, null, 2));
+  return res.json({ status: 'ok', saved: true });
 });
 
 export default router;

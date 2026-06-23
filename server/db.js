@@ -118,6 +118,55 @@ export async function initDB(retries = 3) {
     );
   `);
 
+  // Ensure pokeapi_cache table exists (separate from initial CREATE for DBs created before migration)
+  try { await db.exec(`CREATE TABLE IF NOT EXISTS pokeapi_cache (url TEXT PRIMARY KEY, data TEXT NOT NULL, cached_at TEXT DEFAULT (datetime('now')))`); } catch (e) { /* ignore */ }
+
+  // === Week 9 tables ===
+  try { await db.exec(`
+    CREATE TABLE IF NOT EXISTS pvp_ratings (
+      user_id INTEGER PRIMARY KEY,
+      rating INTEGER DEFAULT 1000,
+      wins INTEGER DEFAULT 0,
+      losses INTEGER DEFAULT 0,
+      FOREIGN KEY (user_id) REFERENCES users(id)
+    );
+  `); } catch (e) { /* ignore */ }
+
+  try { await db.exec(`
+    CREATE TABLE IF NOT EXISTS player_quests (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id INTEGER NOT NULL,
+      quest_id TEXT NOT NULL,
+      progress INTEGER DEFAULT 0,
+      completed INTEGER DEFAULT 0,
+      claimed INTEGER DEFAULT 0,
+      created_at TEXT DEFAULT (datetime('now')),
+      UNIQUE(user_id, quest_id),
+      FOREIGN KEY (user_id) REFERENCES users(id)
+    );
+  `); } catch (e) { /* ignore */ }
+
+  try { await db.exec(`
+    CREATE TABLE IF NOT EXISTS achievements (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id INTEGER NOT NULL,
+      achievement_id TEXT NOT NULL,
+      unlocked_at TEXT DEFAULT (datetime('now')),
+      UNIQUE(user_id, achievement_id),
+      FOREIGN KEY (user_id) REFERENCES users(id)
+    );
+  `); } catch (e) { /* ignore */ }
+
+  try { await db.exec(`
+    CREATE TABLE IF NOT EXISTS save_backups (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id INTEGER NOT NULL,
+      save_data TEXT NOT NULL,
+      saved_at TEXT DEFAULT (datetime('now')),
+      FOREIGN KEY (user_id) REFERENCES users(id)
+    );
+  `); } catch (e) { /* ignore */ }
+
   // Migrations — add columns that might be missing from old DB
   const migrations = [
     `ALTER TABLE users ADD COLUMN nickname TEXT DEFAULT ''`,
