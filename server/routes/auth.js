@@ -50,7 +50,7 @@ router.post('/tg', asyncHandler(async (req, res) => {
         if (!botToken) {
           logger.warn('BOT_TOKEN not set — allowing dev login. Set BOT_TOKEN for production Telegram auth.');
           tgUser = parseTestUser();
-        } else if (!isProduction) {
+        } else if (!isProduction || process.env.ALLOW_DEV_LOGIN === 'true') {
           tgUser = parseTestUser();
         } else {
           return res.status(403).json({ error: 'Telegram authentication required in production' });
