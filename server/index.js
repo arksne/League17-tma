@@ -23,6 +23,7 @@ import { initSocket } from './socket.js';
 import { config } from './lib/config.js';
 import { logger, requestLogger } from './lib/logger.js';
 import { errorHandler } from './lib/errors.js';
+import diagnoseRoutes from './routes/diagnose.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -64,6 +65,7 @@ app.use('/api/battle', battleRoutes);
 app.use('/api/quests', questsRoutes);
 app.use('/api/achievements', achievementsRoutes);
 app.use('/api/economy', economyRoutes);
+app.use('/api/diagnose', diagnoseRoutes);
 
 // Client-side error log endpoint (forwarded to Pino)
 app.post('/api/log-client-error', (req, res) => {
@@ -234,6 +236,29 @@ try {
 
   initSocket(server, allowedOrigin);
   startWALCheckpoint();
+
+  // Startup diagnostics
+  try {
+    const { runAll, summaryString } = await import('./lib/diagnostics.js');
+    const result = await runAll({ db, baseUrl: `http://localhost:${PORT}` });
+    logger.info(`[startup-check] ${summaryString(result)}`);
+    for (const g of result.groups) {
+      for (const c of g.checks) {
+        if (c.status === 'fail') logger.warn(`[startup-check] ❌ ${c.name}: ${c.detail}`);
+        else if (c.status === 'warn') logger.warn(`[startup-check] ⚠️ ${c.name}: ${c.detail}`);
+      }
+    }
+  } catch (e) {
+    logger.warn({ err: e }, '[startup-check] Диагностика не выполнена');
+  }
+
+  // Launch bot debugger
+  try {
+    const { startBotDebugger } = await import('./bot-debugger.js');
+    startBotDebugger();
+  } catch (e) {
+    logger.warn({ err: e }, 'Bot debugger не запущен');
+  }
 
   server.on('error', (err) => {
     logger.error({ err }, 'Server error');
